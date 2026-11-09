@@ -1,0 +1,317 @@
+# =====================================================================
+# Registre des risques P1–P28 (doc Epi'Tortue, matrice problèmes ↔ solutions)
+#
+# Chaque problème :
+#   titre, domaine, solutions (celles de la matrice)
+#   taux : taux de base « historique » (= état `partielle`, choix C1 de l'utilisateur)
+#     - {comptage: famille, part: f, p_fin_partielle: q} : prior Beta(k+½, n−k+½) sur la probabilité
+#                                       par mission que la famille de causes METTE FIN à la mission,
+#                                       × part attribuée à Pi, convertie en taux/jour avec l'exposition
+#                                       historique, puis divisée par q = probabilité qu'une occurrence de Pi
+#                                       mette fin à la mission dans l'état `partielle` [H44]
+#     - {mediane: x, facteur90: f}    : prior log-normal, 90 % dans [x/f, x·f]  (jugement, voir HYPOTHESES.md)
+#     unité : par jour (sauf mention : par rencontre, par chavirage…)
+#   modulateur : dépendance à l'environnement réel / à l'état (voir sim/risks.py)
+#   mult : multiplicateurs du taux par état de solution, relatifs à `partielle` (= 1).
+#          Valeurs par défaut dans `multiplicateurs_defaut`, surchargées ici si besoin.
+#   consequence : transition d'état (voir sim/risks.py)
+#   cascades : déclenchements explicites d'autres problèmes {vers, prob, delai_h:[min,max]}
+#
+# Toutes les valeurs « jugement » sont reprises et justifiées dans HYPOTHESES.md [H4x–H6x].
+# =====================================================================
+
+calibration:
+  tentatives: 30                 # « 30+ tentatives » (doc défi) — H41
+  exposition_j: 30.0             # [H43] durée moyenne en mer d'une tentative historique
+  captures: [9.5, 30]            # 9–10 cas (utilisateur, H41)
+  logiciel: [8.5, 30]            # 8–9 cas
+  mecanique: [3.5, 30]           # 3–4 cas
+  vitesse_ref_ms: 0.6            # [H45] vitesse fond moyenne historique pour caler la pêche
+  jeux_parametres: 25            # tirages de paramètres (incertitude épistémique) par Monte-Carlo
+
+# multiplicateurs par défaut (médiane, facteur90) relatifs à `partielle`
+multiplicateurs_defaut:          # [H46]
+  absente: [2.0, 1.5]
+  partielle: [1.0, 1.0]
+  validee: [0.25, 2.0]
+
+# P19 (validation, S13) : multiplicateur global sur les problèmes techniques (domaines B–G)
+validation_globale:              # [H47]
+  domaines: [B, C, D, E, F, G]
+  absente: [1.5, 1.3]
+  partielle: [1.0, 1.0]
+  validee: [0.6, 1.5]
+
+# S20 (démarche progressive) : maturité de l'ensemble, même périmètre que P19   [H48]
+demarche_progressive:
+  domaines: [A, B, C, D, E, F, G]
+  absente: [1.2, 1.2]
+  partielle: [1.0, 1.0]
+  validee: [0.8, 1.3]
+
+# Effet des solutions secondaires (2e, 3e… de la liste d'un problème) : racine carrée du
+# multiplicateur (effet partiel)  [H46]
+secondaires_exposant: 0.5
+
+problemes:
+  # ------------------------------------------------------------------ A. Structure / coque
+  P1:
+    titre: Survie de la coque
+    domaine: A
+    solutions: [S1]
+    taux: {mediane: 0.0004, facteur90: 4}          # [H50] par jour à Hs = 4 m
+    modulateur: hs_cube                             # × (Hs/4)³
+    consequence: voie_eau
+    cascades:
+      - {vers: P13, prob: 0.6, delai_h: [1, 72]}
+      - {vers: P28, prob: 0.25, delai_h: [6, 240]}
+  P2:
+    titre: Auto-redressement
+    domaine: A
+    solutions: [S1]
+    taux: {mediane: 0.02, facteur90: 3}            # [H51] chavirages / jour à Hs = 4 m (vagues déferlantes)
+    modulateur: chavirage                           # × (Hs/4)⁴ si Hs > 3 m, sinon 0
+    # le chavirage arrive quelle que soit la solution ; S1 joue sur le redressement :
+    mult: {absente: [1.0, 1.0], partielle: [1.0, 1.0], validee: [1.0, 1.0]}
+    redressement: {absente: 0.30, partielle: 0.85, validee: 0.97}   # [H51] proba de se redresser
+    redressement_drains_bouches: 0.30               # cascade P25 : ailes qui ne se remplissent plus
+    redressement_tardif_par_jour: 0.05              # une vague peut encore remettre le bateau à l'endroit
+    consequence: chavirage
+    cascades:
+      - {vers: P3, prob: 0.25, delai_h: [0, 1]}
+      - {vers: P20, prob: 0.10, delai_h: [0, 1]}    # antenne arrachée
+  P3:
+    titre: Ouvertures (étanchéité des trappes)
+    domaine: A
+    solutions: [S1, S18, S9]
+    taux: {mediane: 0.0003, facteur90: 4}          # [H52] fuite spontanée
+    modulateur: hs_cube
+    consequence: voie_eau_lente
+    cascades:
+      - {vers: P13, prob: 0.5, delai_h: [6, 120]}
+  # ------------------------------------------------------------------ B. Propulsion
+  P4:
+    titre: Propulsion économe et fiable (moteur)
+    domaine: B
+    solutions: [S3, S17]
+    taux: {comptage: mecanique, part: 0.15, p_fin_partielle: 1.0}
+    modulateur: moteur                              # seulement quand le moteur tourne
+    consequence: panne_moteur
+  P5:
+    titre: Étanchéité d'arbre
+    domaine: B
+    solutions: [S2]
+    taux: {comptage: mecanique, part: 0.15, p_fin_partielle: 0.3}
+    modulateur: moteur
+    mult: {absente: [2.0, 1.5], partielle: [1.0, 1.0], validee: [0.05, 3.0]}   # couplage magnétique : plus de joint
+    consequence: voie_eau_lente
+    cascades:
+      - {vers: P13, prob: 0.5, delai_h: [6, 120]}
+      - {vers: P28, prob: 0.10, delai_h: [48, 480]}
+  P6:
+    titre: Protection de l'hélice
+    domaine: B
+    solutions: [S4, S17]
+    taux: {comptage: mecanique, part: 0.20, p_fin_partielle: 0.3}
+    modulateur: debris                              # × (1 + effort de pêche / effort de référence)
+    consequence: helice_engagee
+    degagement_par_jour: 0.15                       # [H53] l'objet se décroche seul
+  # ------------------------------------------------------------------ C. Direction
+  P7:
+    titre: Usure de l'actionneur de barre
+    domaine: C
+    solutions: [S5]
+    taux: {comptage: mecanique, part: 0.50, p_fin_partielle: 0.5}
+    modulateur: cycles_barre                        # × (1 + Hs/2) : plus de vagues, plus de cycles
+    consequence: barre_bloquee
+    cascades:
+      - {vers: P8, prob: 1.0, delai_h: [0, 0]}
+  P8:
+    titre: Redondance de la gouverne
+    domaine: C
+    solutions: [S5, S2, S12]
+    taux: {mediane: 0.0, facteur90: 1}              # pas d'occurrence propre : branche de P7
+    modulateur: aucun
+    secours: {absente: 0.0, partielle: 0.5, validee: 0.9}   # [H54] proba que la poussée
+                                                    # différentielle / 2e safran prenne le relais
+    consequence: secours_gouverne
+  P9:
+    titre: Remontée au vent / weaving
+    domaine: C
+    solutions: [S5, S12]
+    taux: {mediane: 0.0, facteur90: 1}
+    modulateur: aucun
+    perte_vitesse: {absente: 0.25, partielle: 0.12, validee: 0.03}   # [H55] perte de VMG si Hs > 3 m
+    consequence: continue
+  # ------------------------------------------------------------------ D. Énergie
+  P10:
+    titre: Production électrique redondante
+    domaine: D
+    solutions: [S7, S6, S1, S15]
+    taux: {mediane: 0.002, facteur90: 3}           # [H56] panne d'un circuit PV/MPPT/connecteur
+    modulateur: aucun
+    consequence: perte_circuit_pv                   # S6 absente : 1 seul circuit -> production nulle
+  P11:
+    titre: Stockage (batterie)
+    domaine: D
+    solutions: [S6]
+    taux: {mediane: 0.0004, facteur90: 4}          # [H57] défaillance de cellule
+    modulateur: aucun
+    degradation_charge_froid_par_wh: 0.0005         # [H57] perte de capacité par Wh chargé < 0 °C
+    consequence: perte_capacite
+  P12:
+    titre: Gestion logicielle de l'énergie
+    domaine: D
+    solutions: [S8]
+    taux: {mediane: 0.0, facteur90: 1}              # structurel : politique S8 dans sim/energy.py
+    modulateur: aucun
+    consequence: continue
+  # ------------------------------------------------------------------ E. Électronique
+  P13:
+    titre: Étanchéité de l'électronique
+    domaine: E
+    solutions: [S9, S2]
+    taux: {mediane: 0.001, facteur90: 3}           # [H58]
+    modulateur: aucun
+    consequence: panne_electronique
+    cascades:
+      - {vers: P14, prob: 0.4, delai_h: [24, 480]}
+      - {vers: P18, prob: 0.3, delai_h: [0, 24]}
+  P14:
+    titre: Corrosion et vibrations
+    domaine: E
+    solutions: [S9]
+    taux: {mediane: 0.0006, facteur90: 3}          # [H59] à 30 jours, Weibull k = 2,5
+    modulateur: vieillissement
+    consequence: panne_electronique
+  P15:
+    titre: Compatibilité électromagnétique
+    domaine: E
+    solutions: [S9]
+    taux: {mediane: 0.0, facteur90: 1}
+    modulateur: aucun
+    effet_capteurs: {absente: 2.0, partielle: 1.3, validee: 1.0}   # [H60] × taux de pannes GPS/compas
+    consequence: continue
+  # ------------------------------------------------------------------ F. Logiciel
+  P16:
+    titre: Logiciel face à l'imprévu
+    domaine: F
+    solutions: [S10, S8]
+    taux: {comptage: logiciel, part: 0.45, p_fin_partielle: 0.8}
+    modulateur: imprevu                              # × (1 + incidents des 3 derniers jours)
+    consequence: bug_logique
+    issues: {cap_errone: 0.45, blocage_moteur: 0.30, gel: 0.25}     # [H61] (ABoat, Endeavour, Pinta)
+  P17:
+    titre: Failsafe dangereux, bugs temporels, gel
+    domaine: F
+    solutions: [S10, S11]
+    taux: {comptage: logiciel, part: 0.30, p_fin_partielle: 0.3}
+    modulateur: redemarrages                         # × (1 + 0,2 × min(redémarrages, 20))
+    consequence: gel_calculateur
+    bug_49j: {absente: 0.5, partielle: 0.15, validee: 0.0}          # [H62] débordement millis() à 49,7 j
+    failsafe_retour: {absente: 0.5, partielle: 0.15, validee: 0.0}  # [H62] SB Wave : retour au départ
+                                                    # si télémétrie perdue > 48 h
+    watchdog_reprise: {absente: 0.0, partielle: 0.7, validee: 0.98} # S11 : proba de redémarrer après un gel
+  P18:
+    titre: Navigation (capteurs, données corrompues)
+    domaine: F
+    solutions: [S12]
+    taux: {comptage: logiciel, part: 0.25, p_fin_partielle: 0.5}
+    modulateur: aucun
+    consequence: panne_capteur_nav                   # GPS ou compas HS (le reste : sim/failures.py)
+  P19:
+    titre: Validation insuffisante
+    domaine: F
+    solutions: [S13]
+    taux: {mediane: 0.0, facteur90: 1}               # effet global : validation_globale
+    modulateur: aucun
+    consequence: continue
+  # ------------------------------------------------------------------ G. Communication
+  P20:
+    titre: Perte de télémétrie
+    domaine: G
+    solutions: [S14, S18]
+    taux: {mediane: 0.0015, facteur90: 3}          # [H63]
+    modulateur: aucun
+    consequence: perte_iridium
+    cascades:
+      - {vers: P17, prob: 1.0, delai_h: [48, 48], condition: failsafe_retour}
+  P21:
+    titre: Réception de données
+    domaine: G
+    solutions: [S14, S18]
+    taux: {mediane: 0.001, facteur90: 3}           # [H63]
+    modulateur: aucun
+    consequence: perte_reception                     # sans routage météo, effet limité (journalisé)
+  # ------------------------------------------------------------------ H. Sécurité / visibilité
+  P22:
+    titre: Être vu (collision)
+    domaine: H
+    solutions: [S15, S19]
+    taux: {mediane: 1.0, facteur90: 1}               # taux physique : voir rencontres
+    modulateur: collision
+    mult: {absente: [1.0, 1.0], partielle: [1.0, 1.0], validee: [1.0, 1.0]}     # S15 agit via evitement_ais
+    consequence: collision
+    gravite: {coule: 0.25, voie_eau: 0.45, sans_degat: 0.30}        # [H64]
+  P23:
+    titre: Rester identifiable
+    domaine: H
+    solutions: [S15, S19]
+    taux: {mediane: 0.0, facteur90: 1}
+    modulateur: aucun
+    # proba qu'un pêcheur qui trouve le bateau le laisse (ou le signale sans le prendre)
+    laisse: {absente: 0.25, partielle: 0.45, validee: 0.65}          # [H65]
+    consequence: continue
+  # ------------------------------------------------------------------ I. Menaces externes
+  P24:
+    titre: Filets et cordages (pêche)
+    domaine: I
+    solutions: [S1, S16, S4, S19]
+    taux: {comptage: captures, part: 1.0}            # calibre le taux de rencontre avec la pêche
+    modulateur: peche                                # ∝ effort de pêche GFW réel (h/km²/mois)
+    issues: {sans_suite: 0.55, engagement: 0.15, recupere: 0.30}     # [H66] pour une rencontre
+    engagement_issue: {libere: 0.3, capture: 0.5, perdu: 0.2}        # [H66]
+    consequence: rencontre_peche
+  P25:
+    titre: Sargasses et biofouling
+    domaine: I
+    solutions: [S17, S19]
+    taux: {mediane: 0.0, facteur90: 1}
+    modulateur: aucun
+    croissance: {absente: 1.0, partielle: 0.6, validee: 0.25}        # [H67] × biofouling_par_mois
+    seuil_drains: 0.25                               # [H67] encrassement (fraction) qui bouche les drains d'ailes
+    consequence: continue
+  P26:
+    titre: Faune marine
+    domaine: I
+    solutions: [S1]
+    taux: {mediane: 0.0003, facteur90: 5}          # [H68]
+    modulateur: aucun
+    consequence: morsure
+    cascades:
+      - {vers: P1, prob: 0.2, delai_h: [0, 1]}
+  # ------------------------------------------------------------------ J. Fin de mission
+  P27:
+    titre: Pas de perte silencieuse
+    domaine: J
+    solutions: [S18, S14, S1]
+    taux: {mediane: 0.0, facteur90: 1}
+    modulateur: aucun
+    balise_fiable: {absente: 0.0, partielle: 0.7, validee: 0.95}     # [H69]
+    consequence: continue
+  P28:
+    titre: Flottabilité
+    domaine: J
+    solutions: [S18, S1]
+    taux: {mediane: 0.0, facteur90: 1}               # déclenché seulement par cascade (voie d'eau)
+    modulateur: aucun
+    coule: {absente: 0.7, partielle: 0.3, validee: 0.05}             # [H70] âme mousse S1
+    consequence: naufrage
+
+# Collisions avec le trafic commercial (P22) et rencontres de pêche (P24)
+rencontres:
+  rayon_detection_km: 1.0          # [H66] distance à laquelle un pêcheur repère le bateau (calé)
+  vitesse_relative_kmh: 10.0       # [H66]
+  largeur_collision_m: 40.0        # [H64] demi-largeur navire + bateau
+  vitesse_navire_kmh: 25.0
+  evitement_ais: {absente: 0.0, partielle: 0.5, validee: 0.85}       # [H64]

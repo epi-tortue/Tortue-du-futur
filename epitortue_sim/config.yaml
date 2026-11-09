@@ -1,0 +1,222 @@
+# =====================================================================
+# Epi'Tortue — simulateur de mission. Toute valeur non issue de la doc
+# est justifiée dans HYPOTHESES.md (référence entre crochets [Hxx]).
+# =====================================================================
+
+mission:
+  start: "2026-01-01T12:00:00Z"      # écrasable : python main.py --start 2026-06-15
+  max_days: 300                      # borne dure ; tronquée à la fin des données
+  # Départ conforme au règlement Microtransat (D.4) : >= 40 nm d'approche
+  # autonome avant la ligne de départ Ouest (48N 47W – 45,5N 47W). [H01]
+  depart: {lat: 47.0, lon: -48.0}
+  # Zone cible : cercle de 25 km choisi sur la ligne Est (règle D.1). [H02]
+  arrivee: {lat: 52.0, lon: -16.0, rayon_km: 25.0}
+  comparaison_ete: "2026-06-15T12:00:00Z"
+
+# Lignes officielles (microtransat.org, règles en vigueur, section D)
+lignes:
+  ouest: [[48.0, -47.0], [45.5, -47.0], [40.0, -65.0], [30.0, -77.0], [20.0, -59.0], [10.0, -56.0]]
+  est:   [[55.0, -16.0], [51.0, -16.0], [46.0, -11.0], [44.5, -13.5], [37.0, -13.5], [35.0, -20.5], [25.0, -22.0]]
+
+# ---------------------------------------------------------------------
+# Données (téléchargées une fois, cache dans data/, ensuite hors-ligne)
+# ---------------------------------------------------------------------
+donnees:
+  periode: {debut: "2026-01-01", fin: "auto"}   # auto = dernière heure ERA5 complète
+  grille:                     # grille réduite (étape 1) — étendue à 58°N (Rockall, nord de l'Irlande)
+    lat: [42, 58]
+    lon: [-56, -8]
+    pas: 2.0
+  grille_fine:                # option E : couloir 1°, téléchargé progressivement (quota)
+    active: true
+    lat: [42, 58]
+    lon: [-56, -8]
+    pas: 1.0
+  open_meteo:
+    archive_url: "https://archive-api.open-meteo.com/v1/archive"
+    marine_url: "https://marine-api.open-meteo.com/v1/marine"
+    modele_meteo: "era5"
+    points_par_requete: 10
+    poids_max_par_minute: 500   # limites gratuites : 600/min, 5000/h, 10000/jour
+    poids_max_par_heure: 4500
+  gfw:
+    token_fichier: "secrets.yaml"     # ou variable d'env GFW_API_ACCESS_TOKEN
+    bbox: {lat: [40, 58], lon: [-60, -5]}
+    resolution_agregation: 0.5        # degrés (données brutes GFW à 0,1°)
+    mois: ["2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06",
+           "2026-07", "2026-08", "2026-09", "2026-10"]
+  cote:
+    sources:
+      - "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_land.geojson"
+      - "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_minor_islands.geojson"
+    bbox: {lat: [35, 62], lon: [-70, 0]}
+  icebergs:                   # option E : risque glace (hors P1–P28), étape 5
+    active: true
+    source: "International Ice Patrol (USCG/NAIS) — à vérifier en étape 5"
+
+# ---------------------------------------------------------------------
+# Bateau (utilisé à partir de l'étape 2)
+# ---------------------------------------------------------------------
+bateau:
+  # Coque finale epi-tortue/Testa (outputs/optim.json, commit du 13/09/2026 "final Hull").
+  # Valeurs recopiées du JSON (hydro + stabilité) ; le simulateur réimplémente les formules
+  # de résistance de Testa (coque/propulsion.py). Pour une autre coque, remplacer ce bloc.
+  coque:
+    source: "epi-tortue/Testa outputs/optim.json"
+    L: 2.35            # m (LOA < 2,4 m)
+    M: 50.44           # kg, déplacement total (dont batteries 8 kg, lest 10 kg)
+    S: 0.9548          # m², surface mouillée
+    Lwl: 2.3498
+    Bwl: 0.4518
+    T: 0.1411          # m, tirant d'eau
+    Cb: 0.3284
+    volume: 0.04921    # m³
+    largeur_hors_tout: 0.80
+    surface_panneaux_m2: 1.365
+    stabilite: {GM0_m: 0.120, AVS_deg: 180, phi_inondation_deg: 27.5, gite_7ms_deg: 3.9,
+                gite_10ms_deg: 11.4, periode_roulis_s: 1.26, vidange_ailes_s: 150}
+  aero:                              # fardage [H14]
+    a_front_m2: 0.15                 # œuvres mortes vues de face (0,85 × 0,38 m × ~0,40 m + tranche des ailes)
+    a_cote_m2: 0.70                  # L × (franc-bord 0,20 + ½ pont bombé 0,10)
+    cd_front: 0.8                    # = CD_AIR de Testa
+    cd_cote: 1.0
+    a_lat_eau_m2: 0.27               # 0,8 × Lwl × T (carène en V, sans quille)
+    cd_lat_eau: 1.0
+    facteur_profil_vent: 0.72        # [H18] U(0,5 m)/U(10 m), profil log, z0 = 2e-4 m
+  propulsion:
+    rendement_helice: 0.50           # Testa RENDEMENT_PROP
+    rendement_chaine: 0.85           # Testa RENDEMENT_CHAINE
+    diametre_helice_m: 0.15          # [H12] limite la poussée statique
+    p_max_w: 60.0                    # [H12]
+    p_croisiere_w: 21.0              # ≈ 1,5 m/s en eau calme avec la coque Testa
+    vagues_v_ref_ms: 1.5             # [H13] calage de la résistance ajoutée :
+    perte_vagues_hs_moitie_m: 4.0    #       Hs = 4 m de face divise par 2 la vitesse de 1,5 m/s
+  biofouling_par_mois: 0.05          # [H15] +5 %/mois sur le frottement
+  biofouling_facteur_eau_chaude: 3.0 #       x3 au-dessus de 18 °C
+  solaire:
+    rendement_cellules: 0.20         # [H19] -> 1,365 m² × 200 W/m² = 273 Wc
+    derating: 0.70                   # doc simulation solaire (D)
+    iam_b0: 0.05                     # ASHRAE (doc simulation solaire)
+    iam_diffus: 0.95
+    n_mppt: 2
+  batterie:
+    capacite_wh: 480.0
+    soc_initial: 1.0
+    rendement_charge: 0.97           # [H20] aller-retour ≈ 0,95
+    rendement_decharge: 0.98
+    t_charge_min_c: 0.0              # P11 : jamais de charge < 0 °C
+    t_charge_pleine_c: 5.0           # charge réduite linéairement entre 0 et 5 °C
+    capacite_vs_t: [[-20, 0.79], [-10, 0.88], [0, 0.95], [10, 0.98], [25, 1.0]]   # P11
+    delta_t_sur_mer_c: 2.0           # [H16] T_bat = SST + 2 °C (scénario B1)
+    chauffage:                       # scénario B2 (simulé en parallèle : python main.py chauffage)
+      active: false
+      puissance_max_w: 10.0          # [H17]
+      consigne_c: 6.0
+      conductance_w_par_k: 0.8       # [H17] boîtier isolé (~3 cm de mousse) vers la coque/l'eau
+      mode: quand_soleil             # quand_soleil | toujours
+  consommation:                      # 114 Wh/j au total (doc) [H21] répartition
+    calculateur_capteurs_w: 2.5
+    iridium_moyen_w: 0.5
+    ais_feu_w: 1.0                   # S15
+    divers_w: 0.75
+  capteurs:
+    gps_sigma_m: 15.0                # doc P18 : GPS ±15 m, 1 Hz
+    compas_sigma_deg: 3.0            # doc P18 : compas ±3°
+  iridium_periode_h: 6.0             # règle B1 Microtransat : position au moins toutes les 6 h
+
+# Gestion d'énergie (S8). La politique dépend de l'état de S8 :
+#   absente   -> naïve : moteur à p_croisiere tant que le BMS ne coupe pas (SOC 0),
+#                redémarrage à soc_reconnexion (black-out = redémarrage du calculateur, P17)
+#   partielle -> paliers de SOC fixes
+#   validee   -> régulation sur le solde solaire 24 h + délestage hiérarchisé
+energie:
+  soc_reconnexion_bms: 0.10
+  paliers_partielle: [[0.5, 1.0], [0.3, 0.5], [0.0, 0.0]]   # [SOC mini, fraction de p_croisiere]
+  validee:
+    soc_cible: 0.6
+    constante_temps_h: 24.0
+    delestage_1_soc: 0.25            # AIS/feu coupés la journée, Iridium 1 position / 6 h
+    delestage_2_soc: 0.15            # moteur coupé, calculateur en veille (dérive)
+    p_max_w: 40.0
+    veille_nuit: false               # [H24] option : si production moyenne 24 h < seuil, veille la nuit et moteur le jour
+                                     #       (essai janvier : arrivée jour 113 au lieu de 43 -> désactivée par défaut)
+    seuil_veille_w: 15.0
+    constante_temps_jour_h: 6.0
+
+# Navigation et estimation (étape 4)
+navigation:
+  waypoints: []                      # [[lat, lon], ...] avant le cercle d'arrivée
+  loch: false                        # sans loch : vitesse surface = modèle de puissance
+  erreur_modele_vitesse_rel: 0.10    # [H30] borne haute : v ≤ v_nom·(1+ε)
+  erreur_modele_vitesse_bas_rel: 0.5 # [H30] borne basse : v ≥ v_nom·(1−ε_bas) (ralentissement vent/vagues)
+  derive_fenetre_h: 2.0              # [H31] estimation glissante de la dérive (courant + fardage + pertes)
+  derive_marge_ms: 0.7               # [H31] demi-largeur de la borne de dérive juste après un fix
+  derive_croissance_ms_par_h: 0.03   # [H31] élargissement pendant une perte GPS
+  derive_marge_max_ms: 1.5
+  derive_marge_regime_ms: 0.15       # [H31] passage moteur marche <-> arrêt (changement d'attitude)
+  gps_demi_largeur_m: 50.0           # boîte GPS (3,3 σ de 15 m)
+  recentrage_km: 30.0                # recentrage de la projection locale ENU
+  crabe_max_deg: 40.0                # angle de crabe maximal pour compenser la dérive
+  compas_demi_largeur_deg: 8.0       # 3 σ (σ = 3°) + déclinaison résiduelle
+  compas_biais_max_deg: 30.0         # [H32] borne après détection d'un biais
+  compas_detection_n: 6              # incohérences consécutives -> alerte biais
+  seuil_degrade_km: 20.0             # largeur de boîte -> mode dégradé (cap fixe, économie)
+  seuil_derive_km: 100.0             # largeur de boîte -> dérive contrôlée (attente d'un fix)
+  cap_degrade_deg: 75.0              # cap compas tenu en mode dégradé (ENE)
+  fraction_puissance_degrade: 0.5
+
+# Pannes capteurs (étape 4) — taux de base, modulés par S12/S13 dans risks.yaml (étape 6)
+pannes_capteurs:
+  gps_coupure_par_jour: 0.05         # [H33]
+  gps_coupure_duree_mediane_h: 2.0
+  gps_coupure_sigma_log: 1.2
+  gps_panne_definitive_par_jour: 0.0025
+  gps_saut_par_jour: 0.2
+  gps_saut_m: [200, 5000]            # log-uniforme
+  compas_biais_par_jour: 0.007
+  compas_biais_deg_par_jour: 2.0
+  compas_biais_max_deg: 25.0
+  compas_panne_par_jour: 0.002
+
+# ---------------------------------------------------------------------
+# État des solutions S1–S20 : absente | partielle | validee
+# Par défaut tout est absent (le bateau n'existe pas encore), sauf S1 :
+# la coque Testa est conçue (partielle). Remettre 'absente' pour l'ignorer.
+# ---------------------------------------------------------------------
+solutions:
+  S1: partielle # coque à ailes inondables, sans quille — conçue et optimisée (Testa), pas encore construite ni validée
+  S2: absente   # couplage magnétique
+  S3: absente   # motorisation brushless
+  S4: absente   # protection hélice
+  S5: absente   # barre robuste & redondante
+  S6: absente   # double circuit énergie
+  S7: absente   # bilan énergétique
+  S8: absente   # gestion d'énergie hiérarchisée
+  S9: absente   # étanchéité & CEM
+  S10: absente  # architecture logicielle
+  S11: absente  # watchdog matériel
+  S12: absente  # navigation ArduPilot
+  S13: absente  # validation SITL & soak test
+  S14: absente  # liaison satellite
+  S15: absente  # AIS & visibilité
+  S16: absente  # anti-filets
+  S17: absente  # anti-fouling
+  S18: absente  # balise de survie
+  S19: absente  # stratégie de route
+  S20: absente  # démarche progressive
+
+# Calibration (question C) : l'historique Microtransat correspond à des
+# solutions "partielles" en moyenne -> "absente" est pire que l'historique.
+calibration:
+  historique_equivaut_a: partielle
+
+analyses:
+  chauffage_ensemble: 8             # largages décalés de 6 h pour l'analyse du chauffage
+
+simulation:
+  dt_dynamique_s: 600                # run détaillé (histoire, journal)
+  dt_montecarlo_s: 1800              # Monte-Carlo (compromis temps de calcul)
+  graine: 2026
+  n_runs: 500
+  n_runs_contrefactuel: 200          # par solution Sx
+  processus: 14
