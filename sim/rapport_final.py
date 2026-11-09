@@ -6,8 +6,9 @@ import copy
 import time
 from collections import Counter
 
-from . import montecarlo as MC
+from . import carte, journal as JB, report
 from . import rapport_mc as RM
+from . import montecarlo as MC
 from .config import OUT
 from .journal import FINS
 
@@ -93,7 +94,7 @@ def generer(cfg, n_runs, n_cf, chemin_env, ete=True, journal=print):
 
     # 5. histoire la plus probable
     journal("[5/7] Histoire la plus probable (scénario médian)")
-    from . import carte, journal as JB, report, story
+    from . import story
     ctx = story.Contexte(chemin_env)
     modal = Counter(r["fin"] for r in base).most_common(1)[0][0]
     cand = sorted([r for r in base if r["fin"] == modal], key=lambda r: r["jours_fin"])

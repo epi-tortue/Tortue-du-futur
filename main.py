@@ -21,9 +21,11 @@ import copy
 import sys
 import warnings
 
+from sim import config as C, journal, montecarlo as MC, report
+
 warnings.filterwarnings("ignore")
 
-from sim import config as C  # noqa: E402
+from sim import carte, chauffage  # noqa: E402
 from sim.config import DATA, OUT  # noqa: E402
 
 
@@ -89,7 +91,7 @@ def cmd_controle(args, cfg):
 
 
 def _sorties_run(cfg, r, nom, titre, contexte=""):
-    from sim import carte, journal, report
+    from sim import report
     out = [carte.carte_folium(cfg, r, f"{nom}_carte", titre),
            report.courbes_run(cfg, r, f"{nom}_courbes", titre),
            report.carte_trajectoires(cfg, {"trajectoire": r}, f"{nom}_carte_statique", titre),
@@ -113,7 +115,7 @@ def cmd_simuler(args, cfg):
 
 
 def cmd_chauffage(args, cfg):
-    from sim import chauffage, story
+    from sim import story
     chauffage.analyser(cfg, story.Contexte(chemin_grille()))
     return 0
 
@@ -181,7 +183,7 @@ def cmd_recits(args, cfg):
     """Régénère les récits « et si » et l'histoire la plus probable depuis le Monte-Carlo sauvegardé."""
     from collections import Counter
 
-    from sim import carte, journal, montecarlo as MC, report, story
+    from sim import story
     from sim.journal import FINS
     et = etiquette(cfg)
     base = MC.charger(f"reference_{et}")["actuel"]
