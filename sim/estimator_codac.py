@@ -28,9 +28,14 @@ import math
 from collections import deque
 
 import numpy as np
-from codac import AnalyticFunction, CtcInverse, IntervalVector, VectorVar, cos, sin, vec
+from codac import AnalyticFunction, CtcInverse, Interval, IntervalVector, VectorVar, cos, sin, vec
 
+from . import arrondi as AR
 from .geo import ENU
+
+# `import codac` laisse le processeur en arrondi vers le haut : on revient au plus proche pour le reste du
+# simulateur, et on ne repasse vers le haut que pendant les calculs Codac (sim/arrondi.py) [H78].
+AR.au_plus_proche()
 
 
 def _fonction_evolution():
@@ -47,7 +52,8 @@ _CTC = None
 def _ctc():
     global _CTC
     if _CTC is None:
-        _CTC = _fonction_evolution()
+        with AR.vers_le_haut():
+            _CTC = _fonction_evolution()
     return _CTC
 
 
@@ -86,11 +92,48 @@ class EstimateurCodac:
         self.recentrage_m = self.n.get("recentrage_km", 30.0) * 1000.0
 
     # ------------------------------------------------------------------
+    # La boîte est gardée sous forme de 4 bornes flottantes (_lim) : lire une borne d'un IntervalVector
+    # coûte un appel C++ (~2 µs), et on les lit plusieurs fois par pas. L'objet Codac n'est reconstruit
+    # que s'il sert (intersection), et le centre et la largeur sont calculés par Codac, une fois par
+    # boîte (Interval.mid() n'est pas toujours (lb + ub) / 2) : résultats identiques au bit près.
+    @property
+    def box(self) -> IntervalVector:
+        b = self._box
+        if b is None:
+            x0, x1, y0, y1 = self._lim
+            b = self._box = IntervalVector([[x0, x1], [y0, y1]])
+        return b
+
+    @box.setter
+    def box(self, b: IntervalVector):
+        self._box = b
+        self._lim = (b[0].lb(), b[0].ub(), b[1].lb(), b[1].ub())
+        self._mid = self._larg = None
+
+    def _poser(self, x0, x1, y0, y1):
+        """Nouvelle boîte [x0, x1] × [y0, y1] (bornes non vides), sans objet Codac intermédiaire."""
+        self._lim = (x0, x1, y0, y1)
+        self._box = self._mid = self._larg = None
+
     def largeur_m(self) -> float:
-        return float(max(self.box[0].diam(), self.box[1].diam()))
+        if self._larg is None:
+            x0, x1, y0, y1 = self._lim
+            AR.haut()
+            try:
+                self._larg = float(max(Interval(x0, x1).diam(), Interval(y0, y1).diam()))
+            finally:
+                AR.au_plus_proche()
+        return self._larg
 
     def centre_local(self):
-        return float(self.box[0].mid()), float(self.box[1].mid())
+        if self._mid is None:
+            x0, x1, y0, y1 = self._lim
+            AR.haut()
+            try:
+                self._mid = (float(Interval(x0, x1).mid()), float(Interval(y0, y1).mid()))
+            finally:
+                AR.au_plus_proche()
+        return self._mid
 
     def centre_geo(self):
         x, y = self.centre_local()
@@ -99,13 +142,14 @@ class EstimateurCodac:
 
     def contient_geo(self, lat, lon, tol_m=1e-6) -> bool:
         x, y = self.enu.vers_local(lat, lon)
-        return (self.box[0].lb() - tol_m <= x <= self.box[0].ub() + tol_m and
-                self.box[1].lb() - tol_m <= y <= self.box[1].ub() + tol_m)
+        x0, x1, y0, y1 = self._lim
+        return x0 - tol_m <= x <= x1 + tol_m and y0 - tol_m <= y <= y1 + tol_m
 
     def boite_geo(self):
         """(lat_min, lat_max, lon_min, lon_max) pour l'affichage."""
-        la0, lo0 = self.enu.vers_geo(self.box[0].lb(), self.box[1].lb())
-        la1, lo1 = self.enu.vers_geo(self.box[0].ub(), self.box[1].ub())
+        x0, x1, y0, y1 = self._lim
+        la0, lo0 = self.enu.vers_geo(x0, y0)
+        la1, lo1 = self.enu.vers_geo(x1, y1)
         return float(la0), float(la1), float(lo0), float(lo1)
 
     def delta(self, t, v_nom=None, cap_deg=None):
@@ -141,11 +185,26 @@ class EstimateurCodac:
         return w
 
     # ------------------------------------------------------------------
-    def predire(self, t, dt, v_nom, cap_compas_deg):
-        """Propage la boîte de t à t+dt. cap_compas_deg=None si aucun cap fiable."""
+    def predire(self, t, dt, v_nom, cap_compas_deg, endormi=False):
+        """Propage la boîte de t à t+dt. cap_compas_deg=None si aucun cap fiable.
+
+        endormi=True : le calculateur ne tourne pas (veille de nuit, black-out). La dérive estimée moteur
+        en marche ne vaut plus rien (le bateau s'est mis en travers) : la boîte grandit avec la seule
+        borne physique de la dérive libre, ±derive_veille_max_ms autour de zéro [H31]."""
+        if endormi:
+            vmax = self.n.get("derive_veille_max_ms", 2.5)
+            m = vmax * dt * 1.01 + 0.5
+            x0, x1, y0, y1 = self._lim
+            self._poser(x0 - m, x1 + m, y0 - m, y1 + m)
+            self.derive_connue = False                 # à réestimer au réveil…
+            self.d_est = np.zeros(2)                   # …en repartant de zéro (l'ancienne valeur est périmée)
+            self.fixes.clear()
+            self.v_hist.clear()
+            self._recentrer()
+            return
         eps = self.n["erreur_modele_vitesse_rel"]
         eps_bas = self.n.get("erreur_modele_vitesse_bas_rel", eps)
-        v = IntervalVector([[max(0.0, v_nom * (1 - eps_bas)), v_nom * (1 + eps)]])[0]
+        v_lb, v_ub = max(0.0, v_nom * (1 - eps_bas)), v_nom * (1 + eps)   # bornes exactes de l'intervalle v
         dl = self.delta(t + dt, v_nom, None if self.compas_hs else cap_compas_deg)
         if cap_compas_deg is None or self.compas_hs:
             psi = [-math.pi, math.pi]
@@ -158,17 +217,24 @@ class EstimateurCodac:
         self.v_hist.append((t, v_nom))
         while self.v_hist and self.v_hist[0][0] < t - self.n["derive_fenetre_h"] * 3600.0:
             self.v_hist.popleft()
+        x0, x1, y0, y1 = self._lim
         X = IntervalVector([
-            [self.box[0].lb(), self.box[0].ub()], [self.box[1].lb(), self.box[1].ub()],
-            [-1e9, 1e9], [-1e9, 1e9], [v.lb(), v.ub()], psi,
+            [x0, x1], [y0, y1],
+            [-1e9, 1e9], [-1e9, 1e9], [v_lb, v_ub], psi,
             [self.d_est[0] - dl, self.d_est[0] + dl], [self.d_est[1] - dl, self.d_est[1] + dl], [dt, dt]])
-        _ctc().contract(X)
+        ctc = _ctc()
+        AR.haut()
+        try:
+            ctc.contract(X)
+        finally:
+            AR.au_plus_proche()
         if X.is_empty():   # ne devrait pas arriver (équation toujours satisfiable)
             raise RuntimeError("Contraction vide en prédiction")
         # marge de projection : l'ENU équirectangulaire déforme les distances de ≤ 0,5 %
         # à 30 km de l'origine ; on élargit de 1 % du déplacement maximal du pas.
-        m = 0.01 * dt * (v.ub() + math.hypot(abs(self.d_est[0]) + dl, abs(self.d_est[1]) + dl)) + 0.5
-        self.box = IntervalVector([[X[2].lb() - m, X[2].ub() + m], [X[3].lb() - m, X[3].ub() + m]])
+        m = 0.01 * dt * (v_ub + math.hypot(abs(self.d_est[0]) + dl, abs(self.d_est[1]) + dl)) + 0.5
+        X2, X3 = X[2], X[3]
+        self._poser(X2.lb() - m, X2.ub() + m, X3.lb() - m, X3.ub() + m)
         while self.compas_lectures and self.compas_lectures[0][0] < t - 3 * 3600:
             self.compas_lectures.popleft()
         self._recentrer()
@@ -179,19 +245,32 @@ class EstimateurCodac:
             return "aucun"
         r = self.n["gps_demi_largeur_m"]
         fx, fy = fix_local
-        G = IntervalVector([[fx - r, fx + r], [fy - r, fy + r]])
-        inter = self.box & G
-        if inter.is_empty():
+        # Intersection boîte ∩ [fix ± r] : max et min des bornes, sans arrondi (identique à IntervalVector &)
+        b0, b1, c0, c1 = self._lim
+
+        def inter(r):
+            i = (max(b0, fx - r), min(b1, fx + r), max(c0, fy - r), min(c1, fy + r))
+            return None if (i[0] > i[1] or i[2] > i[3]) else i
+        res = inter(r)
+        # Marge de saut [H34] : la détection d'un fix corrompu se fait avec la boîte GPS étroite (±r) ; un
+        # fix accepté ne contracte la position qu'avec la boîte élargie (±(r + marge)). Un saut plus petit
+        # que la marge, indétectable, ne fait donc plus sortir la vraie position de la boîte.
+        marge = self.n.get("gps_marge_saut_m", 0.0)
+        if marge > 0 and res is not None:
+            r += marge
+            res = inter(r)
+        if res is None:
             self.n_rejets += 1
-            ecart = math.hypot(fx - self.box[0].mid(), fy - self.box[1].mid())
+            cx, cy = self.centre_local()
+            ecart = math.hypot(fx - cx, fy - cy)
             # Reprise garantie : deux fix rejetés consécutifs et cohérents entre eux -> soit la boîte
             # est fausse, soit le GPS l'est ; la vraie position est dans l'enveloppe des deux.
             if self.rejet_prec is not None:
                 t0, x0, y0 = self.rejet_prec
                 vmax = 4.0
                 if math.hypot(fx - x0, fy - y0) <= vmax * (t - t0) + 2 * r:
-                    self.box = IntervalVector([[min(self.box[0].lb(), fx - r), max(self.box[0].ub(), fx + r)],
-                                               [min(self.box[1].lb(), fy - r), max(self.box[1].ub(), fy + r)]])
+                    b0, b1, c0, c1 = self._lim
+                    self._poser(min(b0, fx - r), max(b1, fx + r), min(c0, fy - r), max(c1, fy + r))
                     self.n_reinit += 1
                     self.rejet_prec = None
                     self.journal.append((t, "reinit_boite", f"Deux fix GPS cohérents contredisent la boîte : "
@@ -201,7 +280,7 @@ class EstimateurCodac:
             self.journal.append((t, "fix_rejete", f"Fix GPS rejeté (incohérent avec la boîte, écart ≈ {ecart:.0f} m)"))
             return "rejete"
         self.rejet_prec = None
-        self.box = inter
+        self._poser(*res)
         self.n_acceptes += 1
         if t - self.t_fix > 3600.0:
             # retour du GPS après une coupure : la dérive estimée avant la coupure est périmée
@@ -242,7 +321,7 @@ class EstimateurCodac:
         v_moy = math.hypot(self.S[0] - sx0, self.S[1] - sy0) / T   # norme de la vitesse modèle moyenne
         if v_moy < 0.3:
             return
-        r = self.n["gps_demi_largeur_m"]
+        r = self.n["gps_demi_largeur_m"] + self.n.get("gps_marge_saut_m", 0.0)
         dl = self.n["derive_marge_ms"] * 2
         # vitesse fond moyenne (boîte) moins la dérive -> vecteur v·h (boîte)
         hx = IntervalVector([[(fx - x0 - 2 * r) / T - d0[0] - dl, (fx - x0 + 2 * r) / T - d0[0] + dl]])[0]
@@ -281,14 +360,15 @@ class EstimateurCodac:
         ancien = self.enu
         nouveau = ENU(float(la), float(lo))
         xs, ys = [], []
-        for bx in (self.box[0].lb(), self.box[0].ub()):
-            for by in (self.box[1].lb(), self.box[1].ub()):
+        b0, b1, c0, c1 = self._lim
+        for bx in (b0, b1):
+            for by in (c0, c1):
                 a, b = ancien.vers_geo(bx, by)
                 u, v = nouveau.vers_local(a, b)
                 xs.append(float(u))
                 ys.append(float(v))
         m = 1.0 + 1e-6 * self.largeur_m()     # marge de conversion (projection non conforme)
-        self.box = IntervalVector([[min(xs) - m, max(xs) + m], [min(ys) - m, max(ys) + m]])
+        self._poser(min(xs) - m, max(xs) + m, min(ys) - m, max(ys) + m)
         nf = deque()
         for (tf, fx, fy, sx, sy, d) in self.fixes:
             a, b = ancien.vers_geo(fx, fy)

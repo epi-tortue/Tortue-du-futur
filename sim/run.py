@@ -26,6 +26,7 @@ from .autopilot import Autopilote, cap_crabe
 from .environment import Environnement, charger_cote
 from .failures import Aleas, Capteurs
 from .geo import NM, cap_initial, deplacer, haversine
+from .risks import facteur_lacet as RK_facteur_lacet
 
 MODULES_DEFAUT = {"energie": True, "estimateur": True, "risques": True}
 
@@ -81,10 +82,13 @@ def iso(t: float) -> str:
 class Simulation:
     def __init__(self, cfg: dict, env: Environnement | None = None, cote=None, p_constante: float | None = None,
                  modules: dict | None = None, graine: int | None = None, jeu=None, densites=None,
-                 registre_yaml: dict | None = None, dt: float | None = None, enregistrer_tout: bool = True):
+                 registre_yaml: dict | None = None, dt: float | None = None, enregistrer_tout: bool = True,
+                 champs_traj: tuple | None = None):
         self.cfg = cfg
         self.env = env or Environnement()
         self.terre, self.terre_prep = cote or charger_cote()
+        from .environment import masque_cote
+        self.masque = masque_cote((self.terre, self.terre_prep))
         self.coque = B.Coque.depuis_config(cfg)
         self.ap = Autopilote.depuis_config(cfg)
         self.dt = float(dt or cfg["simulation"]["dt_dynamique_s"])
@@ -98,10 +102,15 @@ class Simulation:
         self.graine = int(cfg["simulation"]["graine"] if graine is None else graine)
         self.aleas = Aleas(self.graine)
         self.enregistrer_tout = enregistrer_tout
+        # champs_traj : n'enregistrer que ces séries (Monte-Carlo : le résumé n'en lit que quelques-unes).
+        # Les champs relus par la boucle elle-même (v_surf, mode, t) sont toujours gardés.
+        self.champs_traj = None if champs_traj is None else tuple(dict.fromkeys(("t", "v_surf", "mode") + tuple(champs_traj)))
+        from .icebergs import Icebergs
+        self.icebergs = Icebergs.depuis_config(cfg)          # None si désactivé (défaut) [H08]
         self.registre = None
         if self.modules["risques"]:
             from . import risks as RK
-            reg = registre_yaml or RK.charger_registre()
+            reg = RK.registre_pour(cfg, registre_yaml or RK.charger_registre())
             dens = densites or RK.Densites()
             jeu = jeu or RK.tirer_parametres(reg, cfg, 0, dens)
             self.registre = RK.Registre(reg, cfg, jeu, self.aleas, dens)
@@ -165,7 +174,13 @@ class Simulation:
             from .estimator_codac import EstimateurCodac
             est = EstimateurCodac(cfg, self.lat, self.lon, t0)
         R = self.registre
+        p9 = {"modele": "puissance"}
+        p9_sigma = 0.0
         if R is not None:
+            p9 = dict(R.reg["problemes"]["P9"])
+            p9.setdefault("modele", "puissance")
+            if p9["modele"] != "puissance":
+                p9_sigma = float(R.param("P9", "lacet_sigma_deg"))
             P15 = R.param_solution("P15", "effet_capteurs", "S9")
             mP18 = R.multiplicateur("P18")
             capt.mult_gps = capt.mult_compas = P15 * mP18
@@ -194,17 +209,20 @@ class Simulation:
         keys = ["t", "lat", "lon", "cap", "v_surf", "v_fond", "p_moteur", "p_solaire", "p_chauffage", "soc_pct",
                 "t_bat", "dist_restante_nm", "encrassement", "vent", "rafales", "hs", "courant", "sst", "t_air",
                 "ghi", "estime_lat", "estime_lon", "boite_km", "contient", "gps", "mode", "peche"]
+        if self.champs_traj is not None:
+            keys = [k for k in keys if k in self.champs_traj]
         rec = {k: [] for k in keys}
+        traj_complete = self.champs_traj is None
         boites = []          # (t, lat0, lat1, lon0, lon1) pendant les pertes GPS (1/h)
         dt_nominal = self.dt
 
         while True:
             dt = self.dt if not self.epave else max(self.dt, 3 * 3600.0)
             t = self.t
-            ev = self.env.vecteur(t, self.lat, self.lon)
+            ev = self.env.vecteur(t, self.lat, self.lon).tolist()      # flottants Python (mêmes valeurs)
             ix = self.env.idx
-            e = {k: float(ev[ix[k]]) for k in ("vent_u", "vent_v", "rafales", "hs", "vague_dir_u", "vague_dir_v",
-                                                  "courant_u", "courant_v", "sst", "t_air", "dni_h", "dhi", "ghi")}
+            e = {k: ev[ix[k]] for k in ("vent_u", "vent_v", "rafales", "hs", "vague_dir_u", "vague_dir_v",
+                                        "courant_u", "courant_v", "sst", "t_air", "dni_h", "dhi", "ghi", "tp")}
             jours = (t - t0) / 86400.0
             peche = self.densites.peche_h_km2(self.lat, self.lon, t) if self.densites is not None else 0.0
 
@@ -218,7 +236,29 @@ class Simulation:
                 if s["fouling"] > 0:
                     p_pv *= max(0.5, 1 - 0.2 * s["fouling"])        # salissure des panneaux [H15]
                 gest.maj_moyenne(p_pv, dt)
-                hotel = 0.0 if s["calc"] == "eteint" else gest.charge_hotel(s["iridium"], ais_ok, True)
+                if gest.prevision_active and s["calc"] in ("ok", "veille") and not self.epave:
+                    # S8 validée, politique « prevision » : veille de nuit décidée sur la prévision solaire [H74]
+                    f_prev = 0.0 if s["chavire"] else fpv * (max(0.5, 1 - 0.2 * s["fouling"]) if s["fouling"] > 0 else 1.0)
+                    gest.planifier(self.env, t, self.lat, self.lon, bat, p_pv, f_prev, dt, s["iridium"], ais_ok,
+                                   s["reception"])
+                    if gest.veille and s["calc"] == "ok":
+                        s["calc"] = "veille"
+                        if not stats.get("veilles"):
+                            self._ev("veille", "Énergie comptée : le bateau passe en veille profonde pour la nuit "
+                                     "(moteur coupé, calculateur endormi, position toujours transmise) ; il en sera "
+                                     "ainsi chaque nuit tant que le soleil manquera", "P12", 0)
+                        stats["veilles"] = stats.get("veilles", 0) + 1
+                    elif not gest.veille and s["calc"] == "veille":
+                        s["calc"] = "ok"
+                elif s["calc"] == "veille":
+                    s["calc"] = "ok"
+                calc_actif = s["calc"] in ("ok", "gele") and not self.epave
+                if s["calc"] == "eteint":
+                    hotel = 0.0
+                elif s["calc"] == "veille":
+                    hotel = gest.hotel_veille(s["iridium"], ais_ok)
+                else:
+                    hotel = gest.charge_hotel(s["iridium"], ais_ok, True)
             else:
                 hotel = 0.0
 
@@ -236,6 +276,8 @@ class Simulation:
                 mode = "epave"
             elif s["calc"] == "eteint":
                 mode = "black-out"
+            elif s["calc"] == "veille":
+                mode = "veille"
             elif s["calc"] == "gele":
                 mode = "gel"
             elif s["bug_cap"] is not None:
@@ -266,11 +308,11 @@ class Simulation:
                     fraction = nav["fraction_puissance_degrade"]
                     cap_cmd = math.radians(nav["cap_degrade_deg"])
                 else:
+                    v_ref = max(rec["v_surf"][-1], 0.3) if rec["v_surf"] else 1.0
                     if route is None:
                         self.ap.maj_waypoint(lat_e, lon_e)
-                        la, lo = self.ap.cible()
+                        la, lo = self.ap.cible_guidage(lat_e, lon_e, du_est, dv_est, v_ref, dt)
                         route = float(cap_initial(lat_e, lon_e, la, lo))
-                    v_ref = max(rec["v_surf"][-1], 0.3) if rec["v_surf"] else 1.0
                     cap_cmd = cap_crabe_limite(route, v_ref, du_est, dv_est, nav.get("crabe_max_deg", 40.0))
                 if est is not None and est.compas_hs and not gps_ok:
                     mode = "sans_cap"
@@ -296,7 +338,7 @@ class Simulation:
             # ---------------------------------------------------------------- puissance moteur
             if self.modules["energie"]:
                 soc = bat.soc
-                if mode in ("epave", "black-out", "bug_moteur", "sans_cap") or s["moteur_hs"] or s["chavire"]:
+                if mode in ("epave", "black-out", "veille", "bug_moteur", "sans_cap") or s["moteur_hs"] or s["chavire"]:
                     p_mot = 0.0
                 elif mode == "gel":
                     p_mot = s["p_moteur_gel"]
@@ -362,16 +404,44 @@ class Simulation:
                 p_prop *= 0.3
             if s["barre"] == "secours":
                 p_prop *= 0.85
-            if R is not None and e["hs"] > 3.0 and not self.epave:
-                perte = R.param("P9", "perte_vitesse")
-                p_prop *= (1 - perte) ** 3
-                if perte > 0.05 and p_mot > 0 and "P9" not in R.occurrences:
-                    R.noter("P9", t)
-                    self._ev("P9", f"Mer forte (vagues {e['hs']:.1f} m) : le pilote louvoie (weaving), environ "
-                             f"{100 * perte:.0f} % de vitesse utile perdue tant que Hs > 3 m", "P9", 1)
+            f_lacet = 1.0
+            if R is not None and not self.epave:
+                if p9["modele"] == "puissance":
+                    # ancien modèle [H55] : perte appliquée à la puissance, à partir d'un seuil de 3 m
+                    if e["hs"] > 3.0:
+                        perte = R.param("P9", "perte_vitesse")
+                        p_prop *= (1 - perte) ** 3
+                        if perte > 0.05 and p_mot > 0 and "P9" not in R.occurrences:
+                            R.noter("P9", t)
+                            self._ev("P9", f"Mer forte (vagues {e['hs']:.1f} m) : le pilote louvoie (weaving), environ "
+                                     f"{100 * perte:.0f} % de vitesse utile perdue tant que Hs > 3 m", "P9", 1)
+                elif p_prop > 0 and gouvernable and cap_cmd is not None:
+                    # modèle « lacet » [H72] : le bateau serpente autour de son cap (écart-type σ) ; la vitesse
+                    # utile le long de la route vaut v·E[cos] = v·exp(−σ²/2). La résistance ajoutée par les
+                    # vagues, elle, est dans B.equilibre : les deux effets ne se recouvrent pas.
+                    sig = p9_sigma * min(1.0, e["hs"] / p9["hs_ref_m"])
+                    if s["barre"] == "secours":
+                        sig = math.hypot(sig, p9["lacet_secours_deg"])
+                    f_lacet = RK_facteur_lacet(sig)
+                    if 1 - f_lacet > 0.05 and "P9" not in R.occurrences:
+                        R.noter("P9", t)
+                        self._ev("P9", f"Mer forte (vagues {e['hs']:.1f} m) : la barre ne tient pas le cap, le "
+                                 f"bateau fait des lacets de ±{sig:.0f}° (environ {100 * (1 - f_lacet):.0f} % de "
+                                 f"route perdue)", "P9", 1)
             ux, uy, vu, vv = B.equilibre(self.coque, p_prop, cap, e["vent_u"], e["vent_v"], e["courant_u"],
                                          e["courant_v"], e["hs"], e["vague_dir_u"], e["vague_dir_v"], s["fouling"],
                                          cfg["bateau"]["aero"]["facteur_profil_vent"])
+            if f_lacet < 1.0 and ux > 0:
+                perdu = ux * (1.0 - f_lacet)
+                ux -= perdu
+                vu -= perdu * math.sin(cap)
+                vv -= perdu * math.cos(cap)
+            # exposition aux déferlantes : |sin| de l'angle entre l'axe du bateau et les vagues [H71]
+            # (moteur coupé, le bateau est en travers au vent [H23])
+            cap_eff = cap if p_prop > 0 else (math.atan2(e["vent_u"], e["vent_v"]) + math.pi / 2)
+            n_vag = math.hypot(e["vague_dir_u"], e["vague_dir_v"])
+            exposition = (abs(math.sin(cap_eff) * e["vague_dir_v"] - math.cos(cap_eff) * e["vague_dir_u"]) / n_vag
+                          if n_vag > 1e-6 else 1.0)
 
             # ---------------------------------------------------------------- capteurs + estimateur
             lect = []
@@ -392,12 +462,16 @@ class Simulation:
             if est is not None:
                 if not self.epave:
                     cap_lu = capt.cap_compas(math.degrees(cap)) if calc_actif else None
-                    est.predire(t, dt, v_nom, cap_lu)
+                    est.predire(t, dt, v_nom, cap_lu, endormi=s["calc"] in ("veille", "eteint") and
+                                nav.get("derive_veille_max_ms", 2.5) > 0)
             # intégration de la vraie position
             lat2, lon2 = deplacer(self.lat, self.lon, vu * dt, vv * dt)
             dist_pas = haversine(self.lat, self.lon, lat2, lon2)
-            seg = LineString([(self.lon, self.lat), (lon2, lat2)])
-            touche = self.terre_prep.intersects(seg)
+            if self.masque.au_large(self.lat, self.lon, lat2, lon2):
+                touche = False                      # aucune terre à moins d'une maille : test exact inutile
+            else:
+                seg = LineString([(self.lon, self.lat), (lon2, lat2)])
+                touche = self.terre_prep.intersects(seg)
             if not touche:
                 self.lat, self.lon = lat2, lon2
                 stats["dist_parcourue_nm"] += dist_pas / NM
@@ -433,7 +507,7 @@ class Simulation:
 
             # ---------------------------------------------------------------- télémétrie / règlement
             if not self.epave or balise:
-                peut = (s["calc"] == "ok" and s["iridium"] and not s["chavire"]) or balise
+                peut = (s["calc"] in ("ok", "veille") and s["iridium"] and not s["chavire"]) or balise
                 if peut and self.t - t_rapport >= cfg["bateau"]["iridium_periode_h"] * 3600.0:
                     t_rapport = self.t
                     stats["rapports"] += 1
@@ -452,7 +526,7 @@ class Simulation:
 
             # ---------------------------------------------------------------- risques P1–P28
             if R is not None:
-                ctx = dict(hs=e["hs"], p_moteur=p_mot, peche=peche, commerce=self.densites.commerce_h_km2(self.lat, self.lon, t),
+                ctx = dict(hs=e["hs"], tp=e["tp"], exposition=exposition, p_moteur=p_mot, peche=peche, commerce=self.densites.commerce_h_km2(self.lat, self.lon, t),
                            barre_active=gouvernable and cap_cmd is not None, jours=jours, redemarrages=s["redemarrages"],
                            calculateur_actif=calc_actif, en_mer=True, failsafe_retour=not s["iridium"])
                 for pid, origine in R.pas(t, dt, ctx):
@@ -491,6 +565,10 @@ class Simulation:
                     self.terminer("panne_energie", "Fin de mission : plus aucune production solaire, batterie vide")
             else:
                 s["fouling"] = B.encrassement(e["sst"], cfg, s["fouling"], dt / 86400.0)
+            if self.icebergs is not None and "_issue" not in s:
+                lam = self.icebergs.taux_collision_par_jour(t, self.lat, self.lon, math.hypot(vu, vv))
+                if lam > 0 and self.aleas.evenement("iceberg", lam, dt):
+                    self._choc_iceberg(s, R)
             if self.modules["energie"] and s["calc"] == "eteint" and self.cause_fin is None and not self.epave:
                 # black-out prolongé (> 20 jours) : mission considérée perdue
                 if self.t - self._t_dernier_on(rec) > 20 * 86400:
@@ -499,7 +577,11 @@ class Simulation:
 
             # ---------------------------------------------------------------- enregistrement
             dist = haversine(self.lat, self.lon, arr["lat"], arr["lon"])
-            if self.enregistrer_tout or int(self.t // 3600) != int((self.t - dt) // 3600):
+            if not traj_complete and (self.enregistrer_tout or int(self.t // 3600) != int((self.t - dt) // 3600)):
+                vals = dict(t=self.t, lat=self.lat, lon=self.lon, v_surf=ux, dist_restante_nm=dist / NM, mode=mode)
+                for k in keys:
+                    rec[k].append(vals[k])
+            elif self.enregistrer_tout or int(self.t // 3600) != int((self.t - dt) // 3600):
                 vals = dict(t=self.t, lat=self.lat, lon=self.lon, cap=math.degrees(cap) % 360, v_surf=ux,
                             v_fond=math.hypot(vu, vv), p_moteur=p_mot, p_solaire=p_pv, p_chauffage=p_heat,
                             soc_pct=soc_pct, t_bat=bat.t_c, dist_restante_nm=dist / NM, encrassement=s["fouling"],
@@ -553,7 +635,7 @@ class Simulation:
             self.t_fin_mission = self.t
         # position finale connue ?
         retrouve = issue_phys in ("arrivee", "capture", "echouement") or balise or \
-            (s["iridium"] and s["calc"] == "ok" and not s["chavire"])
+            (s["iridium"] and s["calc"] in ("ok", "veille") and not s["chavire"])
         if not retrouve and R is not None:
             R.noter("P27", self.t)
             if hasattr(self, "_occ_mission"):
@@ -633,9 +715,7 @@ class Simulation:
             s["voie_eau"] += 1.0 if c == "voie_eau" else 0.3
             self._ev(pid, f"{titre} : voie d'eau{' importante' if c == 'voie_eau' else ' lente'}{orig}", pid, 2)
         elif c == "chavirage":
-            p_red = R.param("P2", "redressement")
-            if s["drains"]:
-                p_red = min(p_red, R.reg["problemes"]["P2"]["redressement_drains_bouches"])
+            p_red = R.proba_redressement(s["drains"])
             if R.tirage("redressement") < p_red:
                 self._ev(pid, f"Chavirage par mer forte ; le bateau se redresse "
                          f"({'ailes inondables' if self.sol('S1') != 'absente' else 'par chance'})", pid, 1)
@@ -756,6 +836,24 @@ class Simulation:
             else:
                 self._ev(pid, "Voie d'eau, mais la flottabilité (âme mousse) maintient le bateau à flot", pid, 1)
         R.programmer_cascades(self.t, pid)
+        self._pid_courant = None
+
+    def _choc_iceberg(self, s, R):
+        """Choc avec un iceberg (module facultatif, hors P1–P28) [H77]."""
+        g = self.icebergs.gravite
+        u = float(self.aleas.rng("iceberg").random())
+        self._pid_courant = "iceberg"
+        if u < g["coule"]:
+            self._ev("iceberg", "Choc avec un iceberg : la coque est détruite", "iceberg", 3)
+            self._fin_physique(s, "coule", "Coulé après un choc avec un iceberg", "coule")
+        elif u < g["coule"] + g["voie_eau"]:
+            s["voie_eau"] += 1.0
+            self._ev("iceberg", "Choc avec un iceberg : coque endommagée, voie d'eau", "iceberg", 2)
+            if R is not None:
+                from .risks import Cascade
+                R.cascades.append(Cascade(self.t + 3600, "P28", "cascade iceberg"))
+        else:
+            self._ev("iceberg", "Le bateau heurte un glaçon (growler) sans dégât", "iceberg", 0)
         self._pid_courant = None
 
     def _cause_par_defaut(self, cause):

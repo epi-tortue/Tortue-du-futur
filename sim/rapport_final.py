@@ -24,6 +24,49 @@ def _rel(f):
     return str(f).replace(str(OUT) + "\\", "").replace(str(OUT) + "/", "").replace("\\", "/")
 
 
+def MC_PROCESSUS(cfg):
+    import os
+    return cfg["simulation"].get("processus") or max(1, (os.cpu_count() or 2) - 2)
+
+
+def inclure(nom: str, titre: str | None = None) -> list[str]:
+    """Contenu d'un fichier Markdown de out/ (étude séparée), titres décalés d'un niveau ; [] s'il manque."""
+    f = OUT / nom
+    if not f.exists():
+        return []
+    lignes = f.read_text(encoding="utf-8").splitlines()
+    out = []
+    for i, x in enumerate(lignes):
+        if i == 0 and x.startswith("# "):
+            out.append("### " + (titre or x[2:]))
+            continue
+        out.append(("##" + x) if x.startswith("#") else x)
+    return ["", *out]
+
+
+def section_corrections(et: str) -> list[str]:
+    """Section 11 : effet de chaque correction du modèle et études associées (fichiers produits par
+    python main.py effets / peche / annees ; absents = étude non lancée)."""
+    L = ["", "## 11. Corrections du modèle (novembre 2026) : effet mesuré", "",
+         "Chaque correction garde l'ancien comportement comme option (HYPOTHESES.md, H71–H78). Elles sont "
+         "activées une à une, sur les mêmes graines et les mêmes jeux de paramètres, pour mesurer ce que chacune "
+         "change aux résultats clés. Les écarts plus petits que les intervalles à 90 % ne sont pas significatifs."]
+    L += inclure(f"effets_{et}.md", "Effet de chaque correction (python main.py effets)")
+    L += inclure(f"peche_{et}.md", "Captures par les pêcheurs : effet de la route (python main.py peche)")
+    L += inclure(f"annees_{et}.md", "Plusieurs années de météo (python main.py annees)")
+    L += ["", "### Icebergs", "",
+          "Module désactivé par défaut : les observations 2026 de l'International Ice Patrol ne sont pas en libre "
+          "accès, et aucune donnée n'est inventée (H08, H77). Le README donne le format de `data/icebergs.csv` et "
+          "la façon d'obtenir les données (NSIDC G00807, compte Earthdata).",
+          "", "### Mode d'arrondi (H78)", "",
+          "`import codac` laissait le processeur en arrondi vers le haut pour tout le simulateur, mais seulement à "
+          "partir de son premier import dans chaque processus : le premier run de chaque processus du Monte-Carlo "
+          "était calculé un peu différemment des autres. Le simulateur calcule désormais au plus proche, et vers "
+          "le haut seulement pendant les calculs Codac. Effet physique nul ; résultats reproductibles quel que soit "
+          "l'ordre d'exécution des runs."]
+    return L
+
+
 def generer(cfg, n_runs, n_cf, chemin_env, ete=True, journal=print):
     t_debut = time.time()
     et = cfg["mission"]["start"][:10].replace("-", "")
@@ -31,32 +74,35 @@ def generer(cfg, n_runs, n_cf, chemin_env, ete=True, journal=print):
     OUT.mkdir(exist_ok=True)
     R = {}
 
-    # 1. Monte-Carlo de référence + « tout validé »
-    journal(f"[1/7] Monte-Carlo : configuration actuelle et « tout validé » ({n_runs} runs chacun)")
-    res = MC.lancer({"actuel": cfg, "tout_valide": _tout(cfg)}, n_runs, chemin_env, journal=journal)
-    MC.sauver(res, f"reference_{et}")
-    base, best = res["actuel"], res["tout_valide"]
-
-    # 2. contrefactuels
-    journal(f"[2/7] Contrefactuels « + Sx » et « tout validé − Sx » ({n_cf} runs par configuration)")
-    cf_aj = MC.lancer(MC.configs_contrefactuelles(cfg, "ajout"), n_cf, chemin_env, journal=journal)
-    MC.sauver(cf_aj, f"cf_ajout_{et}")
-    cf_re = MC.lancer(MC.configs_contrefactuelles(cfg, "retrait"), n_cf, chemin_env, journal=journal)
-    MC.sauver(cf_re, f"cf_retrait_{et}")
-
-    # 3. saison + calibration
-    res_ete = None
-    if ete:
-        journal("[3/7] Comparaison : départ le " + cfg["mission"]["comparaison_ete"][:10])
-        ce = copy.deepcopy(cfg)
-        ce["mission"]["start"] = cfg["mission"]["comparaison_ete"]
-        res_ete = MC.lancer({"actuel": ce, "tout_valide": _tout(ce)}, max(100, n_runs // 2), chemin_env,
-                            journal=journal)
-        MC.sauver(res_ete, f"ete_{ce['mission']['start'][:10].replace('-', '')}")
-    journal("[3b/7] Contrôle de calibration (toutes solutions « partielles », départ d'été)")
+    # 1–3. Tous les Monte-Carlo du rapport, dans un seul pool de processus (mêmes graines et mêmes résultats
+    #      que des appels séparés ; les runs communs à plusieurs étapes ne sont calculés qu'une fois)
+    journal(f"[1-3/7] Monte-Carlo : actuel et « tout validé » ({n_runs} runs), contrefactuels « + Sx » et "
+            f"« tout validé − Sx » ({n_cf} runs par configuration), saison, calibration")
+    ce = copy.deepcopy(cfg)
+    ce["mission"]["start"] = cfg["mission"]["comparaison_ete"]
     ch = _tout(cfg, "partielle")
     ch["mission"]["start"] = cfg["mission"]["comparaison_ete"]
-    calib = MC.lancer({"historique": ch}, 200, chemin_env, journal=journal)["historique"]
+    etapes = {"reference": ({"actuel": cfg, "tout_valide": _tout(cfg)}, n_runs),
+              "cf_ajout": (MC.configs_contrefactuelles(cfg, "ajout"), n_cf),
+              "cf_retrait": (MC.configs_contrefactuelles(cfg, "retrait"), n_cf),
+              "calibration": ({"historique": ch}, 200)}
+    if ete:
+        etapes["ete"] = ({"actuel": ce, "tout_valide": _tout(ce)}, max(100, n_runs // 2))
+    t_mc = time.time()
+    lot = MC.lancer_lot(etapes, chemin_env, journal=journal)
+    journal(f"  Monte-Carlo terminés en {(time.time() - t_mc) / 60:.1f} min")
+    chrono = {"monte_carlo": time.time() - t_mc}
+    res, cf_aj, cf_re = lot["reference"], lot["cf_ajout"], lot["cf_retrait"]
+    MC.sauver(res, f"reference_{et}")
+    MC.sauver(cf_aj, f"cf_ajout_{et}")
+    MC.sauver(cf_re, f"cf_retrait_{et}")
+    base, best = res["actuel"], res["tout_valide"]
+    res_ete = None
+    if ete:
+        res_ete = lot["ete"]
+        MC.sauver(res_ete, f"ete_{ce['mission']['start'][:10].replace('-', '')}")
+    calib = lot["calibration"]["historique"]
+    t_etape = time.time()
 
     # 4. figures
     journal("[4/7] Figures")
@@ -93,6 +139,7 @@ def generer(cfg, n_runs, n_cf, chemin_env, ete=True, journal=print):
                                                 "points de % d'arrivée perdus — intervalle à 90 %")
 
     # 5. histoire la plus probable
+    chrono["figures"], t_etape = time.time() - t_etape, time.time()
     journal("[5/7] Histoire la plus probable (scénario médian)")
     from . import story
     ctx = story.Contexte(chemin_env)
@@ -115,6 +162,7 @@ def generer(cfg, n_runs, n_cf, chemin_env, ete=True, journal=print):
                     JB.journal_de_bord(cb, rbest, f"histoire_toutvalide_{et}_journal", titre_b)]
 
     # 6. récits « et si »
+    chrono["histoire"], t_etape = time.time() - t_etape, time.time()
     journal("[6/7] Récits « et si je ne le résous pas ? » (P1–P28)")
     recits = {}
     for pid in ctx.reg["problemes"]:
@@ -122,6 +170,7 @@ def generer(cfg, n_runs, n_cf, chemin_env, ete=True, journal=print):
         recits[pid] = f
 
     # 7. chauffage (question B) et rapport
+    chrono["recits"], t_etape = time.time() - t_etape, time.time()
     journal("[7/7] Chauffage de la batterie et rédaction du rapport")
     from . import chauffage
     chauffage.analyser(copy.deepcopy(cfg), ctx)
@@ -129,20 +178,23 @@ def generer(cfg, n_runs, n_cf, chemin_env, ete=True, journal=print):
     from . import run as RR
     import numpy as np
     cercles = []
-    for la in (51.2, 52.0, 53.0, 54.0):
-        jours, arr = [], 0
+    lats_c = (51.2, 52.0, 53.0, 54.0)
+    cfgs_c = []
+    for la in lats_c:
         for k in range(6):
             c = copy.deepcopy(cfg)
             c["mission"]["start"] = RR.iso(RR.t_epoch(cfg["mission"]["start"]) + k * 6 * 3600).replace(" ", "T") + ":00Z"
             c["mission"]["arrivee"]["lat"] = la
             c["solutions"]["S8"] = "validee"
             c["solutions"]["S6"] = "validee"
-            r = RR.Simulation(c, ctx.env, ctx.cote, dt=c["simulation"]["dt_montecarlo_s"],
-                              modules=dict(estimateur=False, risques=False)).executer()
-            jours.append(r.jours)
-            arr += r.fin == "arrivee"
-        cercles.append((la, arr, float(np.median(jours))))
+            cfgs_c.append(c)
+    res_c = MC.lancer_physique(cfgs_c, chemin_env)        # 24 missions indépendantes, en parallèle
+    for i, la in enumerate(lats_c):
+        rs = res_c[6 * i:6 * (i + 1)]
+        cercles.append((la, sum(r["fin"] == "arrivee" for r in rs), float(np.median([r["jours"] for r in rs]))))
 
+    chrono["chauffage_cercles"], t_etape = time.time() - t_etape, time.time()
+    journal("  durées (s) : " + ", ".join(f"{k} {v:.0f}" for k, v in chrono.items()))
     L = [f"# Epi'Tortue — que se serait-il passé avec un largage le {date} ?", "",
          "> **Avertissement.** Ce rapport rejoue la météo, les vagues, les courants et l'activité de pêche *réels* de "
          "2026 (ERA5, Open-Meteo Marine, Global Fishing Watch). Le bateau, ses pannes et ses rencontres sont "
@@ -220,12 +272,14 @@ def generer(cfg, n_runs, n_cf, chemin_env, ete=True, journal=print):
           "| Centre du cercle | Arrivées | Jour de fin (médiane) |", "|---|---|---|"]
     for la, arr, jm in cercles:
         L.append(f"| {la:.1f}°N 16°W | {arr}/6 | {jm:.0f} |")
-    L += ["", "  → viser le **sud du segment** et aborder par le sud-ouest (au vent) est une piste S19 à tester "
-          "(paramètre `mission.arrivee` de config.yaml).",
+    L += ["", "  → l'autopilote vise désormais par défaut le **bord sud du cercle, décalé en amont de la dérive "
+          "estimée** (stratégie `navigation.approche.strategie: bord_sud`, H75) ; l'ancienne stratégie (viser le "
+          "centre) reste disponible. Effet mesuré : section 11.",
           "- **En hiver, l'électronique mange l'énergie.** La production solaire réelle de janvier (≈ 5 W en "
           "moyenne, ≈ 130 Wh/j) couvre à peine les 114 Wh/j de consommation de bord : il reste quelques watts pour "
-          "le moteur. La veille de nuit (option `energie.validee.veille_nuit`) économise de l'énergie mais retarde "
-          "l'arrivée dans la zone critique ; elle est désactivée par défaut.", "",
+          "le moteur. La gestion d'énergie validée (S8) prévoit donc le solaire des 24 h suivantes et ne garde en "
+          "réserve que l'énergie de l'électronique de nuit ; quand le soleil manque, elle met le bateau en veille "
+          "profonde la nuit (H74). Effet mesuré : section 11.", "",
           "## 9. Contrôle de calibration", "",
           "Toutes solutions « partielles » (≈ flotte historique, hypothèse C1), départ d'été, 200 runs :", ""]
     fam = {"captures (P23/P24)": ("P24", "P23"), "logiciel (P16–P18)": ("P16", "P17", "P18"),
@@ -247,9 +301,16 @@ def generer(cfg, n_runs, n_cf, chemin_env, ete=True, journal=print):
           "boîte, hors sauts GPS sous le seuil de détection et pannes de capteur non encore détectées).",
           f"- Monte-Carlo : {n_runs} runs (référence), {n_cf} par contrefactuel, pas de {cfg['simulation']['dt_montecarlo_s'] / 60:.0f} min, "
           "nombres aléatoires communs ; intervalles par bootstrap hiérarchique.",
-          "- Le modèle de chavirage (×(Hs/4)⁴ au-delà de 3 m) et les taux sans historique (P1, P3, P10, P11, P13, "
-          "P14, P20, P21, P26) sont des jugements : ce sont eux qu'il faut challenger en premier.",
-          f"- Calcul : {(time.time() - t_debut) / 60:.0f} min."]
+          "- Le chavirage dépend maintenant de la cambrure des vagues (déferlement) et de la stabilité de la coque "
+          "(H71) ; ses seuils « face ou dos à la vague » et les taux sans historique (P1, P3, P10, P11, P13, P14, "
+          "P20, P21, P26) restent des jugements : ce sont eux qu'il faut challenger en premier.",
+          "- Une seule année de météo (2026) sert au rapport principal ; la section 11 montre ce que change la "
+          "météo d'autres années."]
+    L += section_corrections(et)
+    L += ["", "## 12. Calcul", "",
+          f"- Durée totale : {(time.time() - t_debut) / 60:.1f} min ({MC_PROCESSUS(cfg)} processus) ; "
+          + ", ".join(f"{k.replace('_', ' ')} {v:.0f} s" for k, v in chrono.items()) + "."]
+    L += inclure(f"optimisation_{et}.md", "Optimisations (résultats identiques au bit près)")
     f = OUT / f"rapport_{et}.md"
     f.write_text("\n".join(L), encoding="utf-8")
     journal(f"Rapport : {f}")

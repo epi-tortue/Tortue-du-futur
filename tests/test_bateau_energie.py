@@ -124,6 +124,8 @@ def test_chauffage_regime_permanent(cfg):
 
 
 def test_gestion_validee_respecte_soc(cfg):
+    cfg = copy.deepcopy(cfg)
+    cfg["energie"]["validee"]["politique"] = "regulation"       # ancienne loi (la nouvelle : test_corrections.py)
     g = EN.GestionEnergie("validee", cfg)
     g.p_pv_moy = 10.0
     assert g.p_moteur(0.10, 4.75) == 0.0 and g.delestage == 2

@@ -14,10 +14,10 @@ from sim.config import DATA
 
 
 def _grille():
-    for nom in ("grille_1deg.npz", "grille_2deg.npz", "grille_2deg_partiel.npz"):
-        if (DATA / nom).exists():
-            return DATA / nom
-    return None
+    f = E.chemin_grille(C.charger(), strict=False)          # la grille que le simulateur utilise réellement
+    if f is None and (DATA / "grille_2deg_partiel.npz").exists():
+        return DATA / "grille_2deg_partiel.npz"
+    return f
 
 
 pytestmark = pytest.mark.skipif(_grille() is None or not (DATA / "cote.wkb").exists(),
@@ -66,6 +66,7 @@ def test_sorties_de_boite_expliquees_par_sauts_gps(cfg, env, cote):
     """Avec des fix corrompus, une sortie de boîte n'est admise que juste après un saut non détecté."""
     c = copy.deepcopy(cfg)
     c["pannes_capteurs"]["gps_saut_par_jour"] = 1.0
+    c["navigation"]["gps_marge_saut_m"] = 0.0      # sans marge : c'est la détection des sauts qui est testée ici
     r = _run(c, env, cote, graine=7, modules=dict(risques=False))
     tr = r.traj
     sauts = np.array(r.stats.get("sauts_t", []))

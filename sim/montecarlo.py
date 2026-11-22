@@ -38,9 +38,10 @@ def _init_worker(chemin_env):
 
 def _jeu(cfg, k):
     from . import risks as RK
-    cle = (k, cfg["mission"]["depart"]["lat"], cfg["mission"]["depart"]["lon"])
+    cle = (k, cfg["mission"]["depart"]["lat"], cfg["mission"]["depart"]["lon"],
+           cfg["mission"]["arrivee"]["lat"], cfg["mission"]["arrivee"]["lon"], RK.signature_registre(cfg))
     if cle not in _G["jeux"]:
-        _G["jeux"][cle] = RK.tirer_parametres(_G["reg"], cfg, k, _G["dens"])
+        _G["jeux"][cle] = RK.tirer_parametres(RK.registre_pour(cfg, _G["reg"]), cfg, k, _G["dens"])
     return _G["jeux"][cle]
 
 
@@ -87,11 +88,16 @@ def _resumer(etq, r, jeu, graine) -> Resume:
                   r.stats.get("hors_boite", 0), trace)
 
 
+# séries de la trajectoire lues par _resumer (les autres ne servent qu'aux runs détaillés)
+CHAMPS_RESUME = ("t", "lat", "lon", "dist_restante_nm")
+
+
 def _executer_un(args):
     etq, cfg, jeu_k, graine = args
     from . import run as R
     sim = R.Simulation(cfg, _G["env"], _G["cote"], graine=graine, jeu=_jeu(cfg, jeu_k), densites=_G["dens"],
-                       registre_yaml=_G["reg"], dt=cfg["simulation"]["dt_montecarlo_s"], enregistrer_tout=True)
+                       registre_yaml=_G["reg"], dt=cfg["simulation"]["dt_montecarlo_s"], enregistrer_tout=True,
+                       champs_traj=CHAMPS_RESUME)
     r = sim.executer()
     return asdict(_resumer(etq, r, jeu_k, graine))
 
@@ -122,6 +128,76 @@ def lancer(configs: dict, n_runs: int, chemin_env, processus=None, journal=print
     return res
 
 
+def _executer_physique(args):
+    cfg, modules = args
+    from . import run as R
+    r = R.Simulation(cfg, _G["env"], _G["cote"], dt=cfg["simulation"]["dt_montecarlo_s"], modules=modules).executer()
+    return {"fin": r.fin, "jours": r.jours, "reste_nm": float(r.traj["dist_restante_nm"][-1]),
+            "stats": {k: v for k, v in r.stats.items() if isinstance(v, (int, float, bool))}}
+
+
+def lancer_physique(cfgs: list, chemin_env, modules=None, processus=None) -> list[dict]:
+    """Missions sans tirage de pannes (analyses physiques : chauffage, cercle d'arrivée), en parallèle.
+
+    Même résultat que de les enchaîner dans le processus principal (aucun aléa partagé entre missions) ;
+    retourne, dans l'ordre de `cfgs`, {fin, jours, reste_nm, stats}."""
+    modules = modules or dict(estimateur=False, risques=False)
+    processus = processus or cfgs[0]["simulation"].get("processus") or max(1, (os.cpu_count() or 2) - 2)
+    with ProcessPoolExecutor(max_workers=min(processus, len(cfgs)), initializer=_init_worker,
+                             initargs=(str(chemin_env),)) as ex:
+        return list(ex.map(_executer_physique, [(c, modules) for c in cfgs]))
+
+
+def _cout_estime(cfg) -> float:
+    """Ordre de grandeur de la durée d'un run : plus il y a de solutions validées, plus la mission dure
+    (elle va jusqu'à l'arrivée au lieu de s'arrêter au bout de quelques jours). Sert seulement à lancer
+    les tâches longues en premier pour que les processus finissent ensemble."""
+    return sum(v == "validee" for v in cfg["solutions"].values()) + 0.5 * sum(
+        v == "partielle" for v in cfg["solutions"].values())
+
+
+def lancer_lot(etapes: dict, chemin_env, processus=None, journal=print) -> dict:
+    """Plusieurs Monte-Carlo dans UN seul pool de processus.
+
+    etapes : {nom: (configs, n_runs)} avec configs = {étiquette: cfg}. Retourne {nom: {étiquette: [Resume]}},
+    exactement ce que renverraient des appels séparés à `lancer` (mêmes graines, mêmes résultats). Gains :
+      - un seul démarrage de processus (import, chargement de la météo) au lieu d'un par étape ;
+      - tâches identiques (même configuration, même jeu, même graine) calculées une seule fois : la
+        « référence » des contrefactuels est un sous-ensemble du Monte-Carlo principal ;
+      - tâches longues en premier : pas de processus qui travaille seul à la fin d'une étape.
+    """
+    any_cfg = next(iter(next(iter(etapes.values()))[0].values()))
+    from .environment import Environnement
+    Environnement(chemin_env)
+    uniques = {}                     # clé -> (cfg, k, g)
+    demandes = []                    # (nom, étiquette, clé)
+    for nom, (configs, n_runs) in etapes.items():
+        for etq, cfg in configs.items():
+            sig = json.dumps(cfg, sort_keys=True, default=str)
+            for (k, g) in plan(cfg, n_runs):
+                cle = (sig, k, g)
+                uniques.setdefault(cle, (cfg, k, g))
+                demandes.append((nom, etq, cle))
+    cles = sorted(uniques, key=lambda c: -_cout_estime(uniques[c][0]))      # tri stable : ordre du plan conservé
+    taches = [("_", uniques[c][0], uniques[c][1], uniques[c][2]) for c in cles]
+    processus = processus or any_cfg["simulation"].get("processus") or max(1, (os.cpu_count() or 2) - 2)
+    journal(f"  {len(demandes)} runs demandés, {len(taches)} à calculer ({len(demandes) - len(taches)} réutilisés), "
+            f"{processus} processus")
+    calcules = {}
+    t0 = time.time()
+    with ProcessPoolExecutor(max_workers=processus, initializer=_init_worker, initargs=(str(chemin_env),)) as ex:
+        for i, (cle, out) in enumerate(zip(cles, ex.map(_executer_un, taches, chunksize=2))):
+            calcules[cle] = out
+            if (i + 1) % max(1, len(taches) // 20) == 0:
+                journal(f"  {i + 1}/{len(taches)} runs ({time.time() - t0:.0f} s)")
+    res = {nom: {etq: [] for etq in configs} for nom, (configs, _) in etapes.items()}
+    for nom, etq, cle in demandes:
+        r = dict(calcules[cle])
+        r["etiquette"] = etq
+        res[nom][etq].append(r)
+    return res
+
+
 # ---------------------------------------------------------------------------
 # Statistiques
 # ---------------------------------------------------------------------------
@@ -135,6 +211,13 @@ def bootstrap(runs, f, n=2000, graine=0):
     groupes = [np.array(v) for v in par_jeu.values()]
     rng = np.random.default_rng(graine)
     est = float(np.mean(np.concatenate(groupes)))
+    from . import noyaux
+    if noyaux.NUMBA:
+        # même algorithme compilé : mêmes tirages, mêmes sommes, mêmes intervalles (test de non-régression)
+        tailles = np.array([len(x) for x in groupes], dtype=np.int64)
+        debuts = np.concatenate([[0], np.cumsum(tailles)[:-1]]).astype(np.int64)
+        vals = noyaux.bootstrap_valeurs(rng, np.concatenate(groupes).astype(np.float64), debuts, tailles, n)
+        return est, float(np.percentile(vals, 5)), float(np.percentile(vals, 95))
     vals = np.empty(n)
     for b in range(n):
         gs = rng.integers(0, len(groupes), len(groupes))

@@ -67,6 +67,31 @@ def figure_issues(runs, nom, titre):
     return str(f)
 
 
+def figure_comparaison(runs_a, runs_b, noms, nom, titre):
+    """Issues de deux configurations côte à côte (barres groupées, intervalles à 90 %). Palette : SERIE[0], [1]."""
+    ia, ib = MC.issues(runs_a), MC.issues(runs_b)
+    ordre = sorted(set(ia) | set(ib), key=lambda k: -max(ia.get(k, (0,))[0], ib.get(k, (0,))[0]))
+    fig, ax = plt.subplots(figsize=(9, 0.6 * len(ordre) + 1.6), constrained_layout=True)
+    y = np.arange(len(ordre))[::-1]
+    h = 0.36
+    for dec, iss, coul, lab in ((+h / 2, ia, SERIE[0], noms[0]), (-h / 2, ib, SERIE[1], noms[1])):
+        est = np.array([iss.get(k, (0.0, 0.0, 0.0))[0] for k in ordre])
+        lo = np.array([iss.get(k, (0.0, 0.0, 0.0))[1] for k in ordre])
+        hi = np.array([iss.get(k, (0.0, 0.0, 0.0))[2] for k in ordre])
+        ax.barh(y + dec, 100 * est, height=h, color=coul, label=lab)
+        ax.errorbar(100 * est, y + dec, xerr=[100 * (est - lo), 100 * (hi - est)], fmt="none", ecolor=ENCRE,
+                    elinewidth=1, capsize=2)
+    ax.set_yticks(y, [FINS.get(k, k) for k in ordre], fontsize=9, color=ENCRE)
+    ax.set_xlabel("probabilité (%) — barre : estimation ; trait : intervalle à 90 %", color=ENCRE2, fontsize=9)
+    ax.legend(fontsize=8, frameon=False, loc="lower right")
+    _style(ax)
+    ax.set_title(titre, fontsize=11, color=ENCRE, loc="left")
+    f = OUT / f"{nom}.png"
+    fig.savefig(f, dpi=120)
+    plt.close(fig)
+    return str(f)
+
+
 def figure_jours(runs, nom, titre):
     j = np.array([r["jours_fin"] for r in runs])
     succes = np.array([r["fin"] == "arrivee" for r in runs])

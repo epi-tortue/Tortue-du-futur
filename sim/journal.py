@@ -9,6 +9,7 @@ from .config import OUT
 
 MODES = {"normal": "route vers l'arrivée", "degrade": "mode dégradé (cap fixe ENE, puissance réduite)",
          "sans_cap": "attente (aucun cap fiable, moteur coupé)", "black-out": "black-out (batterie vide)",
+         "veille": "veille de nuit planifiée (économie d'énergie)",
          "gel": "calculateur figé", "bug_cap": "cap erroné (bug logiciel)",
          "bug_moteur": "moteur bloqué à l'arrêt (bug logiciel)",
          "failsafe_retour": "failsafe « retour au point de départ »", "epave": "épave (dérive libre)"}

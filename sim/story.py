@@ -30,9 +30,11 @@ class Contexte:
 
     def jeu(self, cfg, k):
         from . import risks as RK
-        if k not in self._jeux:
-            self._jeux[k] = RK.tirer_parametres(self.reg, cfg, k, self.dens)
-        return self._jeux[k]
+        cle = (k, cfg["mission"]["depart"]["lat"], cfg["mission"]["depart"]["lon"],
+               cfg["mission"]["arrivee"]["lat"], cfg["mission"]["arrivee"]["lon"], RK.signature_registre(cfg))
+        if cle not in self._jeux:
+            self._jeux[cle] = RK.tirer_parametres(RK.registre_pour(cfg, self.reg), cfg, k, self.dens)
+        return self._jeux[cle]
 
     def rejouer(self, cfg, graine, jeu_k, dt=None):
         from . import run as R

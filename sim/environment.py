@@ -92,6 +92,105 @@ def fin_donnees(cfg: dict) -> str:
     return fin
 
 
+def annee_de_base(cfg: dict) -> int:
+    return int(cfg["donnees"]["periode"]["debut"][:4])
+
+
+def periode_annee(cfg: dict, annee: int | None = None) -> tuple[str, str]:
+    """(début, fin) des données d'une année. L'année de base suit `donnees.periode` ; une autre année
+    couvre le 1er janvier – 31 décembre (elle doit être passée : ERA5 complet)."""
+    base = annee_de_base(cfg)
+    if annee is None or int(annee) == base:
+        return cfg["donnees"]["periode"]["debut"], fin_donnees(cfg)
+    if int(annee) > base:
+        raise ValueError(f"Année {annee} postérieure à l'année de base {base} : données incomplètes")
+    return f"{int(annee)}-01-01", f"{int(annee)}-12-31"
+
+
+def nom_grille(grille: dict, annee: int | None = None, cfg: dict | None = None) -> str:
+    """grille_2deg.npz pour l'année de base, grille_2deg_2024.npz pour une autre année."""
+    suff = "" if annee is None or cfg is None or int(annee) == annee_de_base(cfg) else f"_{int(annee)}"
+    return f"grille_{grille['pas']:g}deg{suff}.npz"
+
+
+def chemin_grille(cfg: dict, annee: int | None = None, strict: bool = True):
+    """Grille à utiliser pour simuler : `simulation.grille` = auto (la plus fine disponible), 1deg ou 2deg.
+
+    Pour une année autre que l'année de base, seule la grille principale (2°) est téléchargée."""
+    choix = str(cfg.get("simulation", {}).get("grille", "auto"))
+    d = cfg["donnees"]
+    if annee is not None and int(annee) != annee_de_base(cfg):
+        cand = [d["grille"]]
+    elif choix == "auto":
+        cand = [d["grille_fine"], d["grille"]]
+    else:
+        cand = [g for g in (d["grille_fine"], d["grille"]) if f"{g['pas']:g}deg" == choix]
+        if not cand:
+            raise ValueError(f"simulation.grille = {choix!r} : attendu auto, "
+                             f"{d['grille_fine']['pas']:g}deg ou {d['grille']['pas']:g}deg")
+    for g in cand:
+        f = DATA / nom_grille(g, annee, cfg)
+        if f.exists():
+            return f
+    if strict:
+        raise FileNotFoundError(f"Aucune grille de données ({', '.join(nom_grille(g, annee, cfg) for g in cand)}) : "
+                                "lancer « python main.py donnees ».")
+    return None
+
+
+def mois_complets(cfg: dict, grille: dict, periode: tuple[str, str]) -> list[str]:
+    """Mois consécutifs, depuis le début de la période, entièrement présents dans le cache."""
+    lats, lons = axes_grille(grille)
+    out = []
+    for mois, _, _ in tranches_mensuelles(*periode):
+        if all(_chemin_point(src, mois, la, lo).exists() for src in SOURCES for la in lats for lo in lons):
+            out.append(mois)
+        else:
+            break
+    return out
+
+
+def telecharger_annees(cfg: dict, log=print) -> dict:
+    """Télécharge la grille principale pour les années de `donnees.annees` autres que l'année de base.
+
+    Ordre : mois par mois, toutes années confondues (janvier 2024, janvier 2025, février 2024…), pour
+    qu'un téléchargement interrompu par le quota laisse le MÊME début d'année exploitable partout.
+    Reprise automatique : les fichiers déjà en cache ne sont pas redemandés. Lève QuotaJournalierAtteint."""
+    base = annee_de_base(cfg)
+    annees = [int(a) for a in cfg["donnees"].get("annees", []) if int(a) != base]
+    g = cfg["donnees"]["grille"]
+    fait = 0
+    for m in range(1, 13):
+        for a in annees:
+            d0 = datetime(a, m, 1).date()
+            d1 = (d0 + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+            fait += telecharger_open_meteo(cfg, g, log=log, periode=(str(d0), str(d1)))
+    return {"annees": annees, "points": fait}
+
+
+def assembler_annees(cfg: dict, log=print) -> dict:
+    """Assemble, pour chaque année supplémentaire, les mois complets en cache. {année: [mois]}."""
+    base = annee_de_base(cfg)
+    g = cfg["donnees"]["grille"]
+    out = {}
+    for a in cfg["donnees"].get("annees", []):
+        a = int(a)
+        if a == base:
+            continue
+        per = periode_annee(cfg, a)
+        mois = mois_complets(cfg, g, per)
+        out[a] = mois
+        if not mois:
+            continue
+        f = DATA / nom_grille(g, a, cfg)
+        deja = lire_meta().get("assemblages", {}).get(f.name, {}).get("mois")
+        if f.exists() and deja == mois:
+            continue
+        assembler(cfg, g, suffixe=f"_{a}", periode=per, mois_liste=mois)
+        log(f"Grille {a} assemblée : {mois[0]} à {mois[-1]}")
+    return out
+
+
 def tranches_mensuelles(debut: str, fin: str):
     d = datetime.fromisoformat(debut).date()
     f = datetime.fromisoformat(fin).date()
@@ -163,10 +262,9 @@ def _convertir(src, var, valeurs, unite):
     return a
 
 
-def telecharger_open_meteo(cfg: dict, grille: dict, log=print):
+def telecharger_open_meteo(cfg: dict, grille: dict, log=print, periode: tuple[str, str] | None = None):
     om = cfg["donnees"]["open_meteo"]
-    debut = cfg["donnees"]["periode"]["debut"]
-    fin = fin_donnees(cfg)
+    debut, fin = periode or periode_annee(cfg)
     lats, lons = axes_grille(grille)
     points = [(la, lo) for la in lats for lo in lons]
     lim = Limiteur(om["poids_max_par_minute"], om["poids_max_par_heure"])
@@ -213,9 +311,8 @@ def telecharger_open_meteo(cfg: dict, grille: dict, log=print):
     return total_fait
 
 
-def etat_cache(cfg: dict, grille: dict) -> dict:
-    debut = cfg["donnees"]["periode"]["debut"]
-    fin = fin_donnees(cfg)
+def etat_cache(cfg: dict, grille: dict, periode: tuple[str, str] | None = None) -> dict:
+    debut, fin = periode or periode_annee(cfg)
     lats, lons = axes_grille(grille)
     res = {}
     for mois, _, _ in tranches_mensuelles(debut, fin):
@@ -290,11 +387,12 @@ def _remplir_plus_proche(a: np.ndarray, lats, lons):
     return flat.reshape(a.shape), n_rempli
 
 
-def assembler(cfg: dict, grille: dict, mois_max: str | None = None, suffixe: str = "") -> Path:
-    debut = cfg["donnees"]["periode"]["debut"]
-    fin = fin_donnees(cfg)
+def assembler(cfg: dict, grille: dict, mois_max: str | None = None, suffixe: str = "",
+              periode: tuple[str, str] | None = None, mois_liste: list[str] | None = None) -> Path:
+    debut, fin = periode or periode_annee(cfg)
     lats, lons = axes_grille(grille)
-    mois_liste = [m for m, _, _ in tranches_mensuelles(debut, fin) if mois_max is None or m <= mois_max]
+    if mois_liste is None:
+        mois_liste = [m for m, _, _ in tranches_mensuelles(debut, fin) if mois_max is None or m <= mois_max]
     out = {}
     t_ref = None
     infos = {}
@@ -401,11 +499,25 @@ class Environnement:
         self.lats = ax["lats"].astype(np.float64)
         self.lons = ax["lons"].astype(np.float64)
         self.P = np.load(pile, mmap_mode="r")
+        # Vue ndarray du même fichier mappé (aucune copie) : l'indexation d'un np.memmap crée un objet
+        # memmap à chaque lecture, ce qui coûte plus cher que la lecture elle-même.
+        self._A = np.asarray(self.P)
+        self._nt, self._nla, self._nlo = len(self.t), len(self.lats), len(self.lons)
+        self._nc = len(self.noms)
+        self._w = np.empty((1, 8))
         self.t_debut, self.t_fin = self.t[0], self.t[-1]
         self._dt = self.t[1] - self.t[0]
         self._dla = self.lats[1] - self.lats[0]
         self._dlo = self.lons[1] - self.lons[0]
         self._irad = np.array([self.idx[k] for k in self.RAYONNEMENT])
+        # Copies en flottants Python des origines et des pas (l'arithmétique sur des scalaires numpy est
+        # plusieurs fois plus lente ; mêmes valeurs IEEE, donc mêmes résultats)
+        self._t0f, self._la0f, self._lo0f = float(self.t[0]), float(self.lats[0]), float(self.lons[0])
+        self._dtf, self._dlaf, self._dlof = float(self._dt), float(self._dla), float(self._dlo)
+        r = [int(i) for i in self._irad]
+        self._rad = slice(r[0], r[-1] + 1) if r == list(range(r[0], r[-1] + 1)) else self._irad
+        self._cle_B = self._cle_B2 = None
+        self._B = self._B2 = None
 
     def hors_domaine(self, lat, lon) -> bool:
         return not (self.lats[0] <= lat <= self.lats[-1] and self.lons[0] <= lon <= self.lons[-1])
@@ -417,18 +529,44 @@ class Environnement:
 
     def vecteur(self, t_s: float, lat: float, lon: float) -> np.ndarray:
         """Tous les champs à (t, lat, lon), ordre self.noms (scalaire, rapide)."""
-        it, ft = self._coins(t_s, self.t[0], self._dt, len(self.t))
-        ia, fa = self._coins(lat, self.lats[0], self._dla, len(self.lats))
-        io, fo = self._coins(lon, self.lons[0], self._dlo, len(self.lons))
-        B = np.asarray(self.P[it:it + 2, ia:ia + 2, io:io + 2, :], dtype=np.float64)
-        w = np.array([1 - ft, ft])[:, None, None] * np.array([1 - fa, fa])[None, :, None] *             np.array([1 - fo, fo])[None, None, :]
-        v = np.tensordot(w, B, axes=([0, 1, 2], [0, 1, 2]))
+        A = self._A
+        coins = self._coins
+        it, ft = coins(t_s, self._t0f, self._dtf, self._nt)
+        ia, fa = coins(lat, self._la0f, self._dlaf, self._nla)
+        io, fo = coins(lon, self._lo0f, self._dlof, self._nlo)
+        # Poids des 8 coins, dans l'ordre (t, lat, lon), et produit matriciel (1×8)·(8×champs) : ce sont
+        # exactement les opérations que faisait np.tensordot (mêmes produits, même appel BLAS), sans
+        # ses vérifications ni ses tableaux intermédiaires.
+        nc = self._nc
+        a0, a1, o0, o1 = 1 - fa, fa, 1 - fo, fo
+        t0, t1 = 1 - ft, ft
+        w = self._w
+        w[0, 0] = t0 * a0 * o0; w[0, 1] = t0 * a0 * o1; w[0, 2] = t0 * a1 * o0; w[0, 3] = t0 * a1 * o1  # noqa: E702
+        w[0, 4] = t1 * a0 * o0; w[0, 5] = t1 * a0 * o1; w[0, 6] = t1 * a1 * o0; w[0, 7] = t1 * a1 * o1  # noqa: E702
+        # bloc des 8 coins : réutilisé tant que la cellule (t, lat, lon) ne change pas (mêmes valeurs)
+        cle = (it, ia, io)
+        if cle == self._cle_B:
+            B = self._B
+        else:
+            B = self._B = A[it:it + 2, ia:ia + 2, io:io + 2, :].reshape(8, nc).astype(np.float64)
+            self._cle_B = cle
+        v = np.dot(w, B).reshape(nc)
         # rayonnement : moyenne de l'heure précédente -> lu à t + 30 min
-        it2, ft2 = self._coins(t_s + 1800.0, self.t[0], self._dt, len(self.t))
+        it2, ft2 = coins(t_s + 1800.0, self._t0f, self._dtf, self._nt)
         if it2 != it or ft2 != ft:
-            B2 = np.asarray(self.P[it2:it2 + 2, ia:ia + 2, io:io + 2, :][..., self._irad], dtype=np.float64)
-            w2 = np.array([1 - ft2, ft2])[:, None, None] * np.array([1 - fa, fa])[None, :, None] *                 np.array([1 - fo, fo])[None, None, :]
-            v[self._irad] = np.tensordot(w2, B2, axes=([0, 1, 2], [0, 1, 2]))
+            t0, t1 = 1 - ft2, ft2
+            w[0, 0] = t0 * a0 * o0; w[0, 1] = t0 * a0 * o1; w[0, 2] = t0 * a1 * o0; w[0, 3] = t0 * a1 * o1  # noqa: E702
+            w[0, 4] = t1 * a0 * o0; w[0, 5] = t1 * a0 * o1; w[0, 6] = t1 * a1 * o0; w[0, 7] = t1 * a1 * o1  # noqa: E702
+            rad = self._rad
+            # ordre Fortran : c'est la disposition que produisait l'indexation par liste d'indices, et le
+            # noyau BLAS (donc l'arrondi) dépend de la disposition mémoire
+            cle2 = (it2, ia, io)
+            if cle2 == self._cle_B2:
+                B2 = self._B2
+            else:
+                B2 = self._B2 = A[it2:it2 + 2, ia:ia + 2, io:io + 2, rad].reshape(8, -1).astype(np.float64, order="F")
+                self._cle_B2 = cle2
+            v[rad] = np.dot(w, B2).reshape(-1)
         return v
 
     def echantillon(self, t_s, lat, lon, champs=None) -> dict:
@@ -556,3 +694,66 @@ def charger_cote():
     from shapely.prepared import prep
     g = wkb.loads((DATA / "cote.wkb").read_bytes())
     return g, prep(g)
+
+
+class MasqueCote:
+    """Grille « y a-t-il de la terre à moins d'une maille ? » pour éviter le test géométrique au large.
+
+    Une maille (0,25°) est marquée si la terre touche la maille élargie d'une maille de chaque côté. Si les
+    deux extrémités d'un déplacement sont dans des mailles non marquées et que le déplacement fait moins
+    d'une maille, le segment ne peut pas toucher la terre : le résultat est exactement celui du test
+    shapely, qui n'est alors pas appelé (au large, c'est-à-dire presque toujours)."""
+
+    PAS = 0.25
+
+    def __init__(self, terre, terre_prep, fichier: Path | None = None):
+        from shapely.geometry import box
+        x0, y0, x1, y1 = terre.bounds
+        self.lon0, self.lat0 = math.floor(x0) - 1.0, math.floor(y0) - 1.0
+        nlo = int(math.ceil((x1 + 1.0 - self.lon0) / self.PAS))
+        nla = int(math.ceil((y1 + 1.0 - self.lat0) / self.PAS))
+        cle = f"{terre.bounds}|{terre.area:.6f}|{self.PAS}"
+        if fichier is not None and fichier.exists():
+            z = np.load(fichier, allow_pickle=False)
+            if str(z["cle"]) == cle:
+                self.proche = z["proche"]
+                self.nla, self.nlo = self.proche.shape
+                return
+        p = self.PAS
+        proche = np.zeros((nla, nlo), dtype=bool)
+        for i in range(nla):
+            la = self.lat0 + i * p
+            for j in range(nlo):
+                lo = self.lon0 + j * p
+                proche[i, j] = terre_prep.intersects(box(lo - p, la - p, lo + 2 * p, la + 2 * p))
+        self.proche = proche
+        self.nla, self.nlo = nla, nlo
+        if fichier is not None:
+            import os
+            tmp = fichier.with_name(fichier.stem + f".tmp{os.getpid()}.npz")
+            np.savez_compressed(tmp, proche=proche, cle=np.array(cle))
+            os.replace(tmp, fichier)
+
+    def au_large(self, lat1, lon1, lat2, lon2) -> bool:
+        """Vrai si le segment ne peut pas toucher la terre (sinon : faire le test exact)."""
+        p = self.PAS
+        if abs(lat2 - lat1) >= p or abs(lon2 - lon1) >= p:
+            return False
+        i1, j1 = int((lat1 - self.lat0) // p), int((lon1 - self.lon0) // p)
+        i2, j2 = int((lat2 - self.lat0) // p), int((lon2 - self.lon0) // p)
+        if not (0 <= i1 < self.nla and 0 <= i2 < self.nla and 0 <= j1 < self.nlo and 0 <= j2 < self.nlo):
+            # hors de l'emprise du trait de côte (élargie d'un degré) : aucune terre connue ici
+            return (i1 < 0 or i1 >= self.nla or j1 < 0 or j1 >= self.nlo) and \
+                   (i2 < 0 or i2 >= self.nla or j2 < 0 or j2 >= self.nlo)
+        return not (self.proche[i1, j1] or self.proche[i2, j2])
+
+
+_MASQUES: dict = {}
+
+
+def masque_cote(cote) -> MasqueCote:
+    """Masque associé à un trait de côte chargé (mis en cache par processus et sur disque)."""
+    m = _MASQUES.get(id(cote[0]))
+    if m is None:
+        m = _MASQUES[id(cote[0])] = MasqueCote(cote[0], cote[1], DATA / "cote_masque.npz")
+    return m

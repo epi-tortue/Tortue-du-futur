@@ -23,6 +23,10 @@ lignes:
 # ---------------------------------------------------------------------
 donnees:
   periode: {debut: "2026-01-01", fin: "auto"}   # auto = dernière heure ERA5 complète
+  # Années de météo à rejouer pour séparer l'aléa météo de l'incertitude du modèle [H76].
+  # L'année de `periode` est toujours disponible ; les autres sont téléchargées à part
+  # (python main.py donnees --annees), reprise automatique quand le quota est atteint.
+  annees: [2024, 2025, 2026]
   grille:                     # grille réduite (étape 1) — étendue à 58°N (Rockall, nord de l'Irlande)
     lat: [42, 58]
     lon: [-56, -8]
@@ -50,9 +54,13 @@ donnees:
       - "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_land.geojson"
       - "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_minor_islands.geojson"
     bbox: {lat: [35, 62], lon: [-70, 0]}
-  icebergs:                   # option E : risque glace (hors P1–P28), étape 5
-    active: true
-    source: "International Ice Patrol (USCG/NAIS) — à vérifier en étape 5"
+  icebergs:                   # risque glace (hors P1–P28) [H08] [H77]
+    active: false             # désactivé : les observations 2026 ne sont pas en libre accès
+    fichier: "data/icebergs.csv"       # format exact et obtention des données : voir README
+    rayon_km: 100.0           # [H77] rayon dans lequel on compte les observations autour du bateau
+    fenetre_jours: 15.0       # [H77] une observation compte ± 15 jours autour de sa date
+    gravite: {coule: 0.5, voie_eau: 0.4, sans_degat: 0.1}     # [H77] issue d'un choc
+    source: "International Ice Patrol Iceberg Sightings Database (NSIDC G00807), compte Earthdata"
 
 # ---------------------------------------------------------------------
 # Bateau (utilisé à partir de l'étape 2)
@@ -142,6 +150,19 @@ energie:
                                      #       (essai janvier : arrivée jour 113 au lieu de 43 -> désactivée par défaut)
     seuil_veille_w: 15.0
     constante_temps_jour_h: 6.0
+    # --- politique de la gestion validée [H74] ---
+    #   prevision  : prévoit le solaire des 24 h suivantes ; ne garde en réserve que l'énergie de
+    #                l'électronique de nuit ; veille profonde la nuit quand le soleil manque (défaut)
+    #   regulation : ancienne loi (régulation sur la moyenne passée, cible de SOC), paramètres ci-dessus
+    politique: prevision
+    prevision: donnees               # donnees = rayonnement réel des 24 h suivantes (prévision parfaite) |
+                                     # persistance = « demain comme aujourd'hui » (ce que le bateau sait faire seul)
+    seuil_continu_w: 8.0             # puissance moteur soutenable jour et nuit au-dessus de laquelle on ne dort pas
+    p_min_utile_w: 5.0               # en dessous, on préfère des rafales à cette puissance (essais : 5 W > 10 W > 21 W)
+    reserve_soc: 0.05                # énergie jamais dépensée (marge avant la coupure du BMS)
+    marge_reserve: 1.2               # réserve de nuit = consommation de veille × 1,2
+    veille_fraction_calculateur: 0.05   # calculateur et divers en veille profonde : 5 % (horloge + réveil)
+    veille_ais_feu: true             # l'AIS et le feu restent allumés la nuit (sécurité, S15)
 
 # Navigation et estimation (étape 4)
 navigation:
@@ -154,7 +175,13 @@ navigation:
   derive_croissance_ms_par_h: 0.03   # [H31] élargissement pendant une perte GPS
   derive_marge_max_ms: 1.5
   derive_marge_regime_ms: 0.15       # [H31] passage moteur marche <-> arrêt (changement d'attitude)
+  derive_veille_max_ms: 2.5          # [H31] calculateur endormi (veille, black-out) : dérive libre bornée par
+                                     #       4 % d'un vent de 30 m/s + 1,3 m/s de courant
+                                     #       (0 = ancien comportement : dérive estimée conservée pendant le sommeil)
   gps_demi_largeur_m: 50.0           # boîte GPS (3,3 σ de 15 m)
+  gps_marge_saut_m: 5000.0           # [H34] marge ajoutée à un fix accepté. Garantie tenue pour tout saut plus
+                                     #       petit ; boîte élargie de 2 × marge. Défaut = plus grand saut modélisé
+                                     #       (pannes_capteurs.gps_saut_m) : 0 sortie de boîte mesurée. 0 = ancien réglage
   recentrage_km: 30.0                # recentrage de la projection locale ENU
   crabe_max_deg: 40.0                # angle de crabe maximal pour compenser la dérive
   compas_demi_largeur_deg: 8.0       # 3 σ (σ = 3°) + déclinaison résiduelle
@@ -164,6 +191,14 @@ navigation:
   seuil_derive_km: 100.0             # largeur de boîte -> dérive contrôlée (attente d'un fix)
   cap_degrade_deg: 75.0              # cap compas tenu en mode dégradé (ENE)
   fraction_puissance_degrade: 0.5
+  # Approche du cercle d'arrivée [H75] : près de l'Irlande, vent et courant portent au nord-est.
+  approche:
+    strategie: bord_sud              # bord_sud (défaut) | centre (ancien comportement)
+    fraction_rayon: 0.6              # point visé : 0,6 rayon au sud du centre (15 km), donc dans le cercle
+    distance_activation_km: 400.0    # en deçà, le point visé est décalé en amont de la dérive estimée
+    gain_derive: 1.0                 # décalage = dérive lissée × temps de trajet restant × gain
+    decalage_max_km: 150.0
+    lissage_derive_h: 24.0           # lissage de la dérive estimée par Codac (fenêtre de 2 h, bruitée)
 
 # Pannes capteurs (étape 4) — taux de base, modulés par S12/S13 dans risks.yaml (étape 6)
 pannes_capteurs:
@@ -212,8 +247,12 @@ calibration:
 
 analyses:
   chauffage_ensemble: 8             # largages décalés de 6 h pour l'analyse du chauffage
+  # [H73] route proche des côtes pour l'étude des captures (python main.py peche) : départ au large de
+  # St John's (Terre-Neuve), comme les tentatives historiques, à travers les Grands Bancs
+  route_cotiere: {depart: {lat: 47.6, lon: -52.4}}
 
 simulation:
+  grille: auto                       # auto = la plus fine disponible (1° puis 2°) | 2deg | 1deg
   dt_dynamique_s: 600                # run détaillé (histoire, journal)
   dt_montecarlo_s: 1800              # Monte-Carlo (compromis temps de calcul)
   graine: 2026

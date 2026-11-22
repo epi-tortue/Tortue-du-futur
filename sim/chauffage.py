@@ -23,35 +23,40 @@ def analyser(cfg, ctx, journal=print):
     n_ens = cfg.get("analyses", {}).get("chauffage_ensemble", 8)
     t_ref = t_epoch(cfg["mission"]["start"])
     bilan = {}
-    for delta in (2.0, 0.0, -3.0, -6.0):
-        for mode in (None, "quand_soleil", "toujours"):
-            agg = dict(ch=0.0, bloq=0.0, ecr=0.0, sol=0.0, mot=0.0, arr=0, jours=[], reste=[])
-            for k in range(n_ens):           # ensemble de largages décalés de 6 h (effet chaotique de la météo)
-                c = copy.deepcopy(cfg)
-                c["mission"]["start"] = iso(t_ref + k * 6 * 3600).replace(" ", "T") + ":00Z"
-                c["solutions"]["S8"] = "validee"
-                c["solutions"]["S6"] = "validee"
-                c["bateau"]["batterie"]["delta_t_sur_mer_c"] = delta
-                c["bateau"]["batterie"]["chauffage"]["active"] = mode is not None
-                if mode:
-                    c["bateau"]["batterie"]["chauffage"]["mode"] = mode
-                r = R.Simulation(c, ctx.env, ctx.cote, dt=c["simulation"]["dt_montecarlo_s"],
-                                 modules=dict(estimateur=False, risques=False)).executer()
-                st = r.stats
-                agg["ch"] += st["e_chauffage"] / n_ens
-                agg["bloq"] += st["e_froid_bloquee"] / n_ens
-                agg["ecr"] += st["e_ecretee"] / n_ens
-                agg["sol"] += (st["e_solaire"] - st["e_ecretee"]) / n_ens
-                agg["mot"] += st["e_moteur"] / n_ens
-                agg["arr"] += r.fin == "arrivee"
-                agg["jours"].append(r.jours)
-                agg["reste"].append(r.traj["dist_restante_nm"][-1])
-            import numpy as np
-            L.append(f"| {delta:+.0f} °C | {mode or 'non'} | {agg['ch']:.0f} Wh | {agg['bloq']:.0f} Wh | "
-                     f"{agg['ecr']:.0f} Wh | {agg['sol']:.0f} Wh | {agg['mot']:.0f} Wh | {agg['arr']}/{n_ens} | "
-                     f"{np.median(agg['jours']):.0f} | {np.median(agg['reste']):.0f} |")
-            journal(L[-1])
-            bilan[(delta, mode)] = (agg["ch"], agg["bloq"], float(np.median(agg["jours"])), agg["arr"])
+    scenarios = [(delta, mode) for delta in (2.0, 0.0, -3.0, -6.0) for mode in (None, "quand_soleil", "toujours")]
+    cfgs = []
+    for delta, mode in scenarios:
+        for k in range(n_ens):               # ensemble de largages décalés de 6 h (effet chaotique de la météo)
+            c = copy.deepcopy(cfg)
+            c["mission"]["start"] = iso(t_ref + k * 6 * 3600).replace(" ", "T") + ":00Z"
+            c["solutions"]["S8"] = "validee"
+            c["solutions"]["S6"] = "validee"
+            c["bateau"]["batterie"]["delta_t_sur_mer_c"] = delta
+            c["bateau"]["batterie"]["chauffage"]["active"] = mode is not None
+            if mode:
+                c["bateau"]["batterie"]["chauffage"]["mode"] = mode
+            cfgs.append(c)
+    # les 96 missions sont indépendantes : en parallèle (mêmes résultats que l'une après l'autre)
+    from . import montecarlo as MC
+    resultats = MC.lancer_physique(cfgs, ctx.env.chemin)
+    import numpy as np
+    for i, (delta, mode) in enumerate(scenarios):
+        agg = dict(ch=0.0, bloq=0.0, ecr=0.0, sol=0.0, mot=0.0, arr=0, jours=[], reste=[])
+        for r in resultats[i * n_ens:(i + 1) * n_ens]:
+            st = r["stats"]
+            agg["ch"] += st["e_chauffage"] / n_ens
+            agg["bloq"] += st["e_froid_bloquee"] / n_ens
+            agg["ecr"] += st["e_ecretee"] / n_ens
+            agg["sol"] += (st["e_solaire"] - st["e_ecretee"]) / n_ens
+            agg["mot"] += st["e_moteur"] / n_ens
+            agg["arr"] += r["fin"] == "arrivee"
+            agg["jours"].append(r["jours"])
+            agg["reste"].append(r["reste_nm"])
+        L.append(f"| {delta:+.0f} °C | {mode or 'non'} | {agg['ch']:.0f} Wh | {agg['bloq']:.0f} Wh | "
+                 f"{agg['ecr']:.0f} Wh | {agg['sol']:.0f} Wh | {agg['mot']:.0f} Wh | {agg['arr']}/{n_ens} | "
+                 f"{np.median(agg['jours']):.0f} | {np.median(agg['reste']):.0f} |")
+        journal(L[-1])
+        bilan[(delta, mode)] = (agg["ch"], agg["bloq"], float(np.median(agg["jours"])), agg["arr"])
     L += ["", "## Verdict", ""]
     for delta in (2.0, 0.0, -3.0, -6.0):
         ch0, bl0, j0, a0 = bilan[(delta, None)]

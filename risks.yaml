@@ -28,6 +28,9 @@ calibration:
   mecanique: [3.5, 30]           # 3–4 cas
   vitesse_ref_ms: 0.6            # [H45] vitesse fond moyenne historique pour caler la pêche
   jeux_parametres: 25            # tirages de paramètres (incertitude épistémique) par Monte-Carlo
+  # [H73] route qui sert à caler la densité de pêche de référence (H45). null = la route de la mission.
+  # La fixer permet de rejouer une AUTRE route (ex. côtière) sans recaler le taux de rencontre.
+  route_reference: null          # ex. {depart: {lat: 47.0, lon: -48.0}, arrivee: {lat: 52.0, lon: -16.0}}
 
 # multiplicateurs par défaut (médiane, facteur90) relatifs à `partielle`
 multiplicateurs_defaut:          # [H46]
@@ -69,8 +72,22 @@ problemes:
     titre: Auto-redressement
     domaine: A
     solutions: [S1]
-    taux: {mediane: 0.02, facteur90: 3}            # [H51] chavirages / jour à Hs = 4 m (vagues déferlantes)
-    modulateur: chavirage                           # × (Hs/4)⁴ si Hs > 3 m, sinon 0
+    # [H51] chavirages / jour dans l'état de mer de référence (Hs = hs_ref_m, T = t_ref_s, bateau en travers)
+    taux: {mediane: 0.02, facteur90: 3}
+    modulateur: chavirage
+    chavirage:                                      # [H71] modèle physique du taux de chavirage
+      modele: deferlement                           # deferlement (défaut) | hs4 (ancien H51 : (Hs/4)^4 si Hs > 3 m)
+      hs_ref_m: 4.0                                 # état de référence où le taux vaut `taux`
+      t_ref_s: 9.24                                 # calé : même taux moyen annuel 2026 (44–56°N) que l'ancien H51 ;
+                                                    #   proche de la période médiane observée à Hs ≈ 4 m (9,4 s)
+      facteur_periode_pic: 1.2                      # Tp ≈ 1,2 × période moyenne (spectre JONSWAP)
+      deferlement_coef: 22.0                        # Banner, Babanin & Young (2000) : b = 22 (ε − 0,055)^2,01
+      deferlement_seuil: 0.055                      #   ε = Hs·k_p/2, pente significative au pic
+      deferlement_exposant: 2.01
+      seuil_travers_sur_L: [0.3, 0.6]               # essais de Southampton : une déferlante de 0,3 L peut chavirer
+                                                    #   un bateau en travers, 0,6 L le chavire à coup sûr
+      seuil_bout_sur_L: [0.6, 1.2]                  # jugement : seuils doublés face ou dos à la vague
+      avs_redressement: true                        # redressement × (AVS − 90°)/90° borné [0 ; 1] (1 pour Testa, AVS 180°)
     # le chavirage arrive quelle que soit la solution ; S1 joue sur le redressement :
     mult: {absente: [1.0, 1.0], partielle: [1.0, 1.0], validee: [1.0, 1.0]}
     redressement: {absente: 0.30, partielle: 0.85, validee: 0.97}   # [H51] proba de se redresser
@@ -141,7 +158,17 @@ problemes:
     solutions: [S5, S12]
     taux: {mediane: 0.0, facteur90: 1}
     modulateur: aucun
-    perte_vitesse: {absente: 0.25, partielle: 0.12, validee: 0.03}   # [H55] perte de VMG si Hs > 3 m
+    # [H72] Deux effets distincts, à ne pas compter deux fois :
+    #   - physique : résistance ajoutée par les vagues, déjà dans sim/boat.py [H13], identique pour tous ;
+    #   - pilotage : lacets autour du cap (barre qui ne tient pas la mer) -> route allongée.
+    # modele = lacet (défaut) : vitesse utile × exp(−σ²/2), σ = écart-type de lacet (croît linéairement
+    #          avec Hs jusqu'à hs_ref_m, sans seuil) ; s'ajoute `lacet_secours_deg` si la barre est en secours.
+    # modele = puissance (ancien H55) : puissance utile × (1 − perte)³ dès que Hs > 3 m.
+    modele: lacet
+    lacet_sigma_deg: {absente: 25.0, partielle: 15.0, validee: 8.0}   # [H72] à Hs >= hs_ref_m
+    lacet_secours_deg: 10.0                         # [H72] gouverne de secours (poussée différentielle)
+    hs_ref_m: 4.0
+    perte_vitesse: {absente: 0.25, partielle: 0.12, validee: 0.03}   # [H55] ancien modèle (puissance)
     consequence: continue
   # ------------------------------------------------------------------ D. Énergie
   P10:
@@ -310,6 +337,7 @@ problemes:
 
 # Collisions avec le trafic commercial (P22) et rencontres de pêche (P24)
 rencontres:
+  facteur_rencontre: 1.0           # [H73] multiplie le taux de rencontre avec la pêche (1 = calage H45)
   rayon_detection_km: 1.0          # [H66] distance à laquelle un pêcheur repère le bateau (calé)
   vitesse_relative_kmh: 10.0       # [H66]
   largeur_collision_m: 40.0        # [H64] demi-largeur navire + bateau

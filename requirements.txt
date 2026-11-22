@@ -1,0 +1,21 @@
+# Cœur du simulateur
+numpy>=2.0
+shapely>=2.0
+PyYAML>=6.0
+requests>=2.31
+matplotlib>=3.8
+
+# Estimateur ensembliste
+codac>=2.1
+
+# Interface (app.py)
+streamlit>=1.40
+folium>=0.17
+
+# Optionnels
+numba>=0.60                 # accélération des noyaux (sim/noyaux.py), repli pur Python sinon
+gfw-api-python-client>=1.4  # données Global Fishing Watch (sim/environment.py)
+
+# Tests
+pytest>=8.0
+pandas>=2.0

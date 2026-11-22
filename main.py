@@ -12,6 +12,10 @@
   python main.py histoire [--graine N] [--reponses "S5=o,S8=n"]   mode histoire interactif
   python main.py rapport [--runs N] [--sans-ete]       tout : MC, contrefactuels, P1–P28, récits, été
   python main.py recits                                régénère récits et histoire probable (MC sauvegardé)
+  python main.py effets [--runs N] [--runs-cf N]       effet de chaque correction du modèle (mêmes graines)
+  python main.py profil                                cProfile d'une mission et d'un petit Monte-Carlo
+  python main.py annees [--runs N]                     rejoue le même départ sur chaque année de météo
+  python main.py peche [--runs N]                      captures : route de la mission contre route côtière
 Options communes : --start AAAA-MM-JJ, --config fichier.yaml
 """
 from __future__ import annotations
@@ -29,10 +33,15 @@ from sim import carte, chauffage  # noqa: E402
 from sim.config import DATA, OUT  # noqa: E402
 
 
-def chemin_grille():
-    for nom in ("grille_1deg.npz", "grille_2deg.npz"):
-        if (DATA / nom).exists():
-            return DATA / nom
+_CFG = {}
+
+
+def chemin_grille(cfg=None):
+    """Grille météo à utiliser (config `simulation.grille` : auto, 1deg ou 2deg)."""
+    from sim import environment as E
+    f = E.chemin_grille(cfg or _CFG.get("cfg") or C.charger(), strict=False)
+    if f is not None:
+        return f
     if (DATA / "grille_2deg_partiel.npz").exists():
         print("ATTENTION : grille partielle (téléchargement incomplet) — résultats limités dans le temps.")
         return DATA / "grille_2deg_partiel.npz"
@@ -66,7 +75,22 @@ def cmd_donnees(args, cfg):
         except E.QuotaJournalierAtteint as e:
             print(f"Quota journalier Open-Meteo atteint : relancer demain (reprise automatique). {e}")
             return 2
-        print(f"Grille assemblée : {E.assembler(cfg, g)}")
+        f = DATA / E.nom_grille(g)
+        if not f.exists():
+            print(f"Grille assemblée : {E.assembler(cfg, g)}")
+        else:
+            print(f"Grille déjà assemblée : {f}")
+    if args.annees:
+        # années supplémentaires [H76] : s'arrête de lui-même au quota, reprend au prochain lancement
+        code = 0
+        try:
+            E.telecharger_annees(cfg)
+        except E.QuotaJournalierAtteint as e:
+            print(f"Quota journalier Open-Meteo atteint : relancer demain (reprise automatique). {e}")
+            code = 2
+        for a, mois in E.assembler_annees(cfg).items():
+            print(f"  {a} : {len(mois)} mois complets" + (f" ({mois[0]} à {mois[-1]})" if mois else ""))
+        return code
     return 0
 
 
@@ -81,6 +105,15 @@ def cmd_etat(args, cfg):
         for k, (n, t) in res.items():
             if n < t:
                 print(f"  {k}: {n}/{t}")
+    for a in cfg["donnees"].get("annees", []):
+        if int(a) == E.annee_de_base(cfg):
+            continue
+        res = E.etat_cache(cfg, cfg["donnees"]["grille"], E.periode_annee(cfg, a))
+        fait = sum(n for n, _ in res.values())
+        tot = sum(t for _, t in res.values())
+        print(f"== année {a} (grille principale) : {fait}/{tot} fichiers point×mois, "
+              f"{len(E.mois_complets(cfg, cfg['donnees']['grille'], E.periode_annee(cfg, a)))} mois complets ==")
+    print(f"Grille utilisée pour simuler : {chemin_grille(cfg)}")
     return 0
 
 
@@ -109,7 +142,8 @@ def cmd_simuler(args, cfg):
         r = ctx.rejouer(cfg, args.graine if args.graine is not None else cfg["simulation"]["graine"], args.jeu,
                         dt=cfg["simulation"]["dt_dynamique_s"] if args.fin else None)
     print(f"Fin : {r.fin} au jour {r.jours:.1f} ; devenir : {r.issue_physique}")
-    for f in _sorties_run(cfg, r, f"mission_{etiquette(cfg)}_g{r.graine}", f"Mission du {cfg['mission']['start'][:10]}"):
+    nom = f"mission_{args.etiquette or etiquette(cfg)}_g{r.graine}"
+    for f in _sorties_run(cfg, r, nom, f"Mission du {cfg['mission']['start'][:10]}"):
         print("  ", f)
     return 0
 
@@ -126,8 +160,8 @@ def cmd_montecarlo(args, cfg):
     n = args.runs or cfg["simulation"]["n_runs"]
     res = MC.lancer({"reference": cfg}, n, chemin_grille())
     runs = res["reference"]
-    MC.sauver(res, f"reference_{etiquette(cfg)}")
-    et = etiquette(cfg)
+    et = args.etiquette or etiquette(cfg)        # --etiquette : sorties à part (comparaison, interface)
+    MC.sauver(res, f"reference_{et}")
     print(RM.figure_issues(runs, f"mc_issues_{et}", f"Issues de la mission ({len(runs)} runs, départ {cfg['mission']['start'][:10]})"))
     print(RM.figure_jours(runs, f"mc_jours_{et}", "Jour de fin de mission"))
     print(RM.figure_positions_finales(cfg, runs, f"mc_positions_{et}", f"Départ {cfg['mission']['start'][:10]}"))
@@ -210,11 +244,36 @@ def cmd_rapport(args, cfg):
                                  ete=not args.sans_ete)
 
 
+def cmd_effets(args, cfg):
+    from sim import effets
+    print(effets.etudier(cfg, args.runs or 200, 100 if args.runs_cf is None else args.runs_cf,
+                         effets.chemins_grilles()))
+    return 0
+
+
+def cmd_profil(args, cfg):
+    from sim import profil
+    print(profil.profiler(cfg, chemin_grille(), n_mc=args.runs or 8, nom=args.nom))
+    return 0
+
+
+def cmd_annees(args, cfg):
+    from sim import annees
+    print(annees.etudier(cfg, args.runs or 200))
+    return 0
+
+
+def cmd_peche(args, cfg):
+    from sim import peche
+    print(peche.etudier(cfg, chemin_grille(), args.runs or 200))
+    return 0
+
+
 # ---------------------------------------------------------------------------
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     commandes = {"donnees", "etat", "controle", "simuler", "chauffage", "montecarlo", "contrefactuels",
-                 "calibration", "histoire", "rapport", "recits"}
+                 "calibration", "histoire", "rapport", "recits", "effets", "profil", "annees", "peche"}
     if not any(a in commandes for a in argv):
         argv = ["rapport"] + argv
     p = argparse.ArgumentParser(description="Simulateur de mission Epi'Tortue")
@@ -227,11 +286,13 @@ def main(argv=None):
         sp.add_argument("--graine", type=int, default=None)
         sp.add_argument("--jeu", type=int, default=0, help="indice du jeu de paramètres")
         sp.add_argument("--config", dest="config_sous", default=None, help="autre fichier de configuration")
+        sp.add_argument("--etiquette", default=None, help="nom des sorties (montecarlo, simuler)")
         return sp
 
     d = commun(sub.add_parser("donnees"))
     d.add_argument("--fine", action="store_true")
     d.add_argument("--sans-gfw", action="store_true")
+    d.add_argument("--annees", action="store_true", help="télécharge aussi les années de donnees.annees")
     commun(sub.add_parser("etat"))
     c = commun(sub.add_parser("controle"))
     c.add_argument("--date", default="2026-01-01T12:00")
@@ -246,12 +307,19 @@ def main(argv=None):
     r = commun(sub.add_parser("rapport"))
     r.add_argument("--runs-cf", type=int, default=None)
     r.add_argument("--sans-ete", action="store_true")
+    e = commun(sub.add_parser("effets"))
+    e.add_argument("--runs-cf", type=int, default=None)
+    pr = commun(sub.add_parser("profil"))
+    pr.add_argument("--nom", default="profil")
+    commun(sub.add_parser("annees"))
+    commun(sub.add_parser("peche"))
     args = p.parse_args(argv)
     cfg = appliquer_start(C.charger(getattr(args, "config_sous", None) or args.config), getattr(args, "start", None))
+    _CFG["cfg"] = cfg
     fn = {"donnees": cmd_donnees, "etat": cmd_etat, "controle": cmd_controle, "simuler": cmd_simuler,
           "chauffage": cmd_chauffage, "montecarlo": cmd_montecarlo, "contrefactuels": cmd_contrefactuels,
           "calibration": cmd_calibration, "histoire": cmd_histoire, "rapport": cmd_rapport,
-          "recits": cmd_recits}[args.cmd]
+          "recits": cmd_recits, "effets": cmd_effets, "profil": cmd_profil, "annees": cmd_annees, "peche": cmd_peche}[args.cmd]
     return fn(args, cfg)
 
 
