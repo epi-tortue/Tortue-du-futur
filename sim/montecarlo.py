@@ -136,16 +136,22 @@ def _executer_physique(args):
             "stats": {k: v for k, v in r.stats.items() if isinstance(v, (int, float, bool))}}
 
 
-def lancer_physique(cfgs: list, chemin_env, modules=None, processus=None) -> list[dict]:
+def lancer_physique(cfgs: list, chemin_env, modules=None, processus=None, on_result=None) -> list[dict]:
     """Missions sans tirage de pannes (analyses physiques : chauffage, cercle d'arrivée), en parallèle.
 
     Même résultat que de les enchaîner dans le processus principal (aucun aléa partagé entre missions) ;
-    retourne, dans l'ordre de `cfgs`, {fin, jours, reste_nm, stats}."""
+    retourne, dans l'ordre de `cfgs`, {fin, jours, reste_nm, stats}. `on_result(index, resultat)` est
+    appelé après chaque mission terminée."""
     modules = modules or dict(estimateur=False, risques=False)
     processus = processus or cfgs[0]["simulation"].get("processus") or max(1, (os.cpu_count() or 2) - 2)
     with ProcessPoolExecutor(max_workers=min(processus, len(cfgs)), initializer=_init_worker,
                              initargs=(str(chemin_env),)) as ex:
-        return list(ex.map(_executer_physique, [(c, modules) for c in cfgs]))
+        res = []
+        for i, out in enumerate(ex.map(_executer_physique, [(c, modules) for c in cfgs])):
+            res.append(out)
+            if on_result is not None:
+                on_result(i, out)
+        return res
 
 
 def _cout_estime(cfg) -> float:
@@ -156,7 +162,7 @@ def _cout_estime(cfg) -> float:
         v == "partielle" for v in cfg["solutions"].values())
 
 
-def lancer_lot(etapes: dict, chemin_env, processus=None, journal=print) -> dict:
+def lancer_lot(etapes: dict, chemin_env, processus=None, journal=print, on_result=None, plans=None) -> dict:
     """Plusieurs Monte-Carlo dans UN seul pool de processus.
 
     etapes : {nom: (configs, n_runs)} avec configs = {étiquette: cfg}. Retourne {nom: {étiquette: [Resume]}},
@@ -165,16 +171,21 @@ def lancer_lot(etapes: dict, chemin_env, processus=None, journal=print) -> dict:
       - tâches identiques (même configuration, même jeu, même graine) calculées une seule fois : la
         « référence » des contrefactuels est un sous-ensemble du Monte-Carlo principal ;
       - tâches longues en premier : pas de processus qui travaille seul à la fin d'une étape.
+
+    `on_result(cle, resultat)` est appelé après chaque run terminé. `plans`, s'il est fourni, permet de
+    préciser les couples (jeu, graine) à lancer pour chaque (étape, configuration).
     """
     any_cfg = next(iter(next(iter(etapes.values()))[0].values()))
     from .environment import Environnement
     Environnement(chemin_env)
     uniques = {}                     # clé -> (cfg, k, g)
     demandes = []                    # (nom, étiquette, clé)
+    plans = plans or {}
     for nom, (configs, n_runs) in etapes.items():
         for etq, cfg in configs.items():
             sig = json.dumps(cfg, sort_keys=True, default=str)
-            for (k, g) in plan(cfg, n_runs):
+            plan_config = plans[(nom, etq)] if (nom, etq) in plans else plan(cfg, n_runs)
+            for (k, g) in plan_config:
                 cle = (sig, k, g)
                 uniques.setdefault(cle, (cfg, k, g))
                 demandes.append((nom, etq, cle))
@@ -188,6 +199,8 @@ def lancer_lot(etapes: dict, chemin_env, processus=None, journal=print) -> dict:
     with ProcessPoolExecutor(max_workers=processus, initializer=_init_worker, initargs=(str(chemin_env),)) as ex:
         for i, (cle, out) in enumerate(zip(cles, ex.map(_executer_un, taches, chunksize=2))):
             calcules[cle] = out
+            if on_result is not None:
+                on_result(cle, out)
             if (i + 1) % max(1, len(taches) // 20) == 0:
                 journal(f"  {i + 1}/{len(taches)} runs ({time.time() - t0:.0f} s)")
     res = {nom: {etq: [] for etq in configs} for nom, (configs, _) in etapes.items()}
