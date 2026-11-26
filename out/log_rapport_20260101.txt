@@ -1,0 +1,72 @@
+[1/7] Monte-Carlo : configuration actuelle et « tout validé » (500 runs chacun)
+  100/1000 runs (17 s)
+  200/1000 runs (24 s)
+  300/1000 runs (35 s)
+  400/1000 runs (48 s)
+  500/1000 runs (57 s)
+  600/1000 runs (86 s)
+  700/1000 runs (106 s)
+  800/1000 runs (130 s)
+  900/1000 runs (153 s)
+  1000/1000 runs (173 s)
+[2/7] Contrefactuels « + Sx » et « tout validé − Sx » (200 runs par configuration)
+  420/4200 runs (59 s)
+  840/4200 runs (106 s)
+  1260/4200 runs (152 s)
+  1680/4200 runs (195 s)
+  2100/4200 runs (244 s)
+  2520/4200 runs (279 s)
+  2940/4200 runs (324 s)
+  3360/4200 runs (369 s)
+  3780/4200 runs (407 s)
+  4200/4200 runs (453 s)
+  420/4200 runs (103 s)
+  840/4200 runs (192 s)
+  1260/4200 runs (278 s)
+  1680/4200 runs (361 s)
+  2100/4200 runs (449 s)
+  2520/4200 runs (544 s)
+  2940/4200 runs (635 s)
+  3360/4200 runs (723 s)
+  3780/4200 runs (815 s)
+  4200/4200 runs (898 s)
+[3/7] Comparaison : départ le 2026-06-15
+  50/500 runs (13 s)
+  100/500 runs (15 s)
+  150/500 runs (22 s)
+  200/500 runs (31 s)
+  250/500 runs (31 s)
+  300/500 runs (32 s)
+  350/500 runs (41 s)
+  400/500 runs (44 s)
+  450/500 runs (49 s)
+  500/500 runs (51 s)
+[3b/7] Contrôle de calibration (toutes solutions « partielles », départ d'été)
+  20/200 runs (14 s)
+  40/200 runs (14 s)
+  60/200 runs (14 s)
+  80/200 runs (15 s)
+  100/200 runs (18 s)
+  120/200 runs (19 s)
+  140/200 runs (28 s)
+  160/200 runs (28 s)
+  180/200 runs (29 s)
+  200/200 runs (29 s)
+[4/7] Figures
+[5/7] Histoire la plus probable (scénario médian)
+[6/7] Récits « et si je ne le résous pas ? » (P1–P28)
+[7/7] Chauffage de la batterie et rédaction du rapport
+| +2 °C | non | 0 Wh | 0 Wh | 13 Wh | 8060 Wh | 4192 Wh | 8/8 | 43 | 13 |
+| +2 °C | quand_soleil | 31 Wh | 0 Wh | 8 Wh | 8072 Wh | 4175 Wh | 8/8 | 43 | 13 |
+| +2 °C | toujours | 130 Wh | 0 Wh | 7 Wh | 8061 Wh | 4067 Wh | 8/8 | 43 | 13 |
+| +0 °C | non | 0 Wh | 0 Wh | 13 Wh | 8060 Wh | 4192 Wh | 8/8 | 43 | 13 |
+| +0 °C | quand_soleil | 103 Wh | 0 Wh | 5 Wh | 8079 Wh | 4114 Wh | 8/8 | 43 | 13 |
+| +0 °C | toujours | 520 Wh | 0 Wh | 1516 Wh | 33843 Wh | 23210 Wh | 8/8 | 106 | 13 |
+| -3 °C | non | 0 Wh | 594 Wh | 2140 Wh | 33303 Wh | 23204 Wh | 8/8 | 106 | 13 |
+| -3 °C | quand_soleil | 261 Wh | 0 Wh | 2 Wh | 8055 Wh | 3940 Wh | 8/8 | 43 | 13 |
+| -3 °C | toujours | 861 Wh | 203 Wh | 1752 Wh | 33644 Wh | 23034 Wh | 8/8 | 106 | 13 |
+| -6 °C | non | 0 Wh | 2642 Wh | 3016 Wh | 33317 Wh | 23389 Wh | 8/8 | 107 | 13 |
+| -6 °C | quand_soleil | 1388 Wh | 15 Wh | 1572 Wh | 36272 Wh | 24255 Wh | 8/8 | 110 | 13 |
+| -6 °C | toujours | 2909 Wh | 886 Wh | 2100 Wh | 33750 Wh | 21460 Wh | 8/8 | 107 | 13 |
+→ C:\Users\tatat\python\moi\Tortue-du-futur\epitortue_sim\out\chauffage_20260101.md
+Rapport : C:\Users\tatat\python\moi\Tortue-du-futur\epitortue_sim\out\rapport_20260101.md

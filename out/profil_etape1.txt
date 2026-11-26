@@ -1,0 +1,121 @@
+Petit Monte-Carlo sans profileur : 8.23 s (16 missions, grille C:\Users\tatat\python\moi\Tortue-du-futur\data\grille_2deg.npz)
+
+
+## Mission seule (tout validé, pas de 30 min) — 1.54 s (sous profileur) — tri : tottime
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+    98640    0.118    0.000    0.188    0.000 boat.py:152(f)
+     1096    0.101    0.000    0.165    0.000 energy.py:62(prevision_solaire)
+     2193    0.059    0.000    0.172    0.000 environment.py:520(vecteur)
+     5482    0.058    0.000    0.100    0.000 numeric.py:997(tensordot)
+     6576    0.041    0.000    0.233    0.000 boat.py:132(_resoudre_axe)
+     5283    0.035    0.000    0.073    0.000 geo.py:10(haversine)
+   155447    0.031    0.000    0.031    0.000 {built-in method builtins.max}
+    37264    0.027    0.000    0.054    0.000 risks.py:345(taux)
+    11026    0.026    0.000    0.026    0.000 _methods.py:96(_clip)
+   160055    0.026    0.000    0.026    0.000 {method 'get' of 'dict' objects}
+    46948    0.026    0.000    0.026    0.000 {built-in method numpy.asarray}
+     12/9    0.024    0.002    0.029    0.003 {built-in method _imp.exec_dynamic}
+     2192    0.023    0.000    0.250    0.000 energy.py:261(planifier)
+     2192    0.022    0.000    0.265    0.000 boat.py:203(equilibre)
+     2192    0.021    0.000    0.117    0.000 risks.py:391(pas)
+    41636    0.019    0.000    0.044    0.000 failures.py:66(evenement)
+     5749    0.018    0.000    0.022    0.000 geo.py:42(vers_local)
+    78693    0.016    0.000    0.016    0.000 {built-in method builtins.min}
+     8888    0.015    0.000    0.015    0.000 {built-in method builtins.round}
+    21928    0.014    0.000    0.020    0.000 {built-in method math.prod}
+   106084    0.014    0.000    0.014    0.000 {built-in method math.copysign}
+    98640    0.014    0.000    0.014    0.000 {built-in method math.tanh}
+    11026    0.014    0.000    0.065    0.000 fromnumeric.py:2245(clip)
+    10964    0.014    0.000    0.021    0.000 environment.py:515(_coins)
+     2192    0.013    0.000    0.019    0.000 memmap.py:358(__getitem__)
+
+
+
+## Mission seule (tout validé, pas de 30 min) — 1.54 s (sous profileur) — tri : cumulative
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+     2192    0.022    0.000    0.265    0.000 boat.py:203(equilibre)
+     2192    0.023    0.000    0.250    0.000 energy.py:261(planifier)
+     6576    0.041    0.000    0.233    0.000 boat.py:132(_resoudre_axe)
+    98640    0.118    0.000    0.188    0.000 boat.py:152(f)
+     2192    0.009    0.000    0.174    0.000 energy.py:231(_prevoir)
+     2193    0.059    0.000    0.172    0.000 environment.py:520(vecteur)
+     1096    0.101    0.000    0.165    0.000 energy.py:62(prevision_solaire)
+     2192    0.021    0.000    0.117    0.000 risks.py:391(pas)
+     5482    0.058    0.000    0.100    0.000 numeric.py:997(tensordot)
+     5283    0.035    0.000    0.073    0.000 geo.py:10(haversine)
+        6    0.000    0.000    0.068    0.011 __init__.py:1(<module>)
+    11026    0.014    0.000    0.065    0.000 fromnumeric.py:2245(clip)
+        1    0.000    0.000    0.061    0.061 estimator_codac.py:95(centre_geo)
+     27/4    0.000    0.000    0.057    0.014 <frozen importlib._bootstrap>:1349(_find_and_load)
+     27/4    0.000    0.000    0.057    0.014 <frozen importlib._bootstrap>:1304(_find_and_load_unlocked)
+     27/4    0.000    0.000    0.056    0.014 <frozen importlib._bootstrap>:911(_load_unlocked)
+     15/4    0.000    0.000    0.055    0.014 <frozen importlib._bootstrap_external>:989(exec_module)
+     72/7    0.000    0.000    0.055    0.008 <frozen importlib._bootstrap>:480(_call_with_frames_removed)
+    37264    0.027    0.000    0.054    0.000 risks.py:345(taux)
+     33/4    0.006    0.000    0.054    0.013 {built-in method builtins.exec}
+    11026    0.009    0.000    0.051    0.000 fromnumeric.py:48(_wrapfunc)
+     6864    0.010    0.000    0.051    0.000 energy.py:142(soc)
+    41636    0.019    0.000    0.044    0.000 failures.py:66(evenement)
+    17578    0.009    0.000    0.040    0.000 energy.py:138(e_plancher)
+        1    0.000    0.000    0.033    0.033 estimator_codac.py:92(centre_local)
+
+
+
+## Petit Monte-Carlo (8 runs × 2 configurations, un processus) — 15.04 s (sous profileur) — tri : tottime
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+  1123785    1.336    0.000    2.110    0.000 boat.py:152(f)
+     7716    0.705    0.000    1.127    0.000 energy.py:62(prevision_solaire)
+    24989    0.652    0.000    1.922    0.000 environment.py:520(vecteur)
+    57694    0.600    0.000    1.036    0.000 numeric.py:997(tensordot)
+    74919    0.460    0.000    2.615    0.000 boat.py:132(_resoudre_axe)
+    56942    0.371    0.000    0.777    0.000 geo.py:10(haversine)
+  1698898    0.325    0.000    0.330    0.000 {built-in method builtins.max}
+   424541    0.304    0.000    0.610    0.000 risks.py:345(taux)
+   508713    0.284    0.000    0.284    0.000 {built-in method numpy.asarray}
+  1629253    0.267    0.000    0.267    0.000 {method 'get' of 'dict' objects}
+   105394    0.257    0.000    0.257    0.000 _methods.py:96(_clip)
+    24973    0.249    0.000    2.972    0.000 boat.py:203(equilibre)
+    24973    0.230    0.000    1.301    0.000 risks.py:391(pas)
+   440932    0.200    0.000    0.469    0.000 failures.py:66(evenement)
+    61245    0.190    0.000    0.229    0.000 geo.py:42(vers_local)
+    15429    0.165    0.000    1.728    0.000 energy.py:261(planifier)
+   100732    0.162    0.000    0.162    0.000 {built-in method builtins.round}
+   797843    0.159    0.000    0.159    0.000 {built-in method builtins.min}
+  1207577    0.156    0.000    0.156    0.000 {built-in method math.copysign}
+  1123785    0.153    0.000    0.153    0.000 {built-in method math.tanh}
+   230776    0.147    0.000    0.214    0.000 {built-in method math.prod}
+   115388    0.142    0.000    0.223    0.000 environment.py:515(_coins)
+    49946    0.141    0.000    0.331    0.000 risks.py:154(_idx)
+  1128617    0.139    0.000    0.139    0.000 {built-in method math.log10}
+   170666    0.136    0.000    0.301    0.000 energy.py:129(fraction_accessible)
+
+
+
+## Petit Monte-Carlo (8 runs × 2 configurations, un processus) — 15.04 s (sous profileur) — tri : cumulative
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+    24973    0.249    0.000    2.972    0.000 boat.py:203(equilibre)
+    74919    0.460    0.000    2.615    0.000 boat.py:132(_resoudre_axe)
+  1123785    1.336    0.000    2.110    0.000 boat.py:152(f)
+    24989    0.652    0.000    1.922    0.000 environment.py:520(vecteur)
+    15429    0.165    0.000    1.728    0.000 energy.py:261(planifier)
+    24973    0.230    0.000    1.301    0.000 risks.py:391(pas)
+    15429    0.060    0.000    1.189    0.000 energy.py:231(_prevoir)
+     7716    0.705    0.000    1.127    0.000 energy.py:62(prevision_solaire)
+    57694    0.600    0.000    1.036    0.000 numeric.py:997(tensordot)
+    56942    0.371    0.000    0.777    0.000 geo.py:10(haversine)
+   105394    0.131    0.000    0.637    0.000 fromnumeric.py:2245(clip)
+   424541    0.304    0.000    0.610    0.000 risks.py:345(taux)
+   105394    0.087    0.000    0.506    0.000 fromnumeric.py:48(_wrapfunc)
+   440932    0.200    0.000    0.469    0.000 failures.py:66(evenement)
+    67331    0.094    0.000    0.468    0.000 energy.py:142(soc)
+   170666    0.088    0.000    0.412    0.000 energy.py:138(e_plancher)
+    49946    0.141    0.000    0.331    0.000 risks.py:154(_idx)
+  1698898    0.325    0.000    0.330    0.000 {built-in method builtins.max}
+   170666    0.136    0.000    0.301    0.000 energy.py:129(fraction_accessible)
+   508713    0.284    0.000    0.284    0.000 {built-in method numpy.asarray}
+  1629253    0.267    0.000    0.267    0.000 {method 'get' of 'dict' objects}
+   105394    0.257    0.000    0.257    0.000 _methods.py:96(_clip)
+    63931    0.077    0.000    0.247    0.000 {method 'clip' of 'numpy.generic' objects}
+    61245    0.190    0.000    0.229    0.000 geo.py:42(vers_local)
+   115388    0.142    0.000    0.223    0.000 environment.py:515(_coins)
+

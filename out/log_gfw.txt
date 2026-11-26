@@ -1,0 +1,21 @@
+[gfw peche 2026-01] 89533 h
+[gfw peche 2026-02] 105157 h
+[gfw peche 2026-03] 141349 h
+[gfw peche 2026-04] 140861 h
+[gfw peche 2026-05] 160384 h
+[gfw peche 2026-06] 183196 h
+[gfw peche 2026-07] 221202 h
+[gfw peche 2026-08] 184833 h
+[gfw peche 2026-09] 143846 h
+[gfw peche 2026-10] 134325 h
+[gfw commerce 2026-01] 312389 h
+[gfw commerce 2026-02] 335472 h
+[gfw commerce 2026-03] 364512 h
+[gfw commerce 2026-04] 334406 h
+[gfw commerce 2026-05] 344963 h
+[gfw commerce 2026-06] 336601 h
+[gfw commerce 2026-07] 345260 h
+[gfw commerce 2026-08] 361165 h
+[gfw commerce 2026-09] 359756 h
+[gfw commerce 2026-10] 378932 h
+GFW OK

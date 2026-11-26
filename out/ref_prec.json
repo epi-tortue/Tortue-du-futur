@@ -1,0 +1,203 @@
+{
+ "actuel": [
+  {
+   "jeu": 0,
+   "graine": 202600000,
+   "fin": "calculateur",
+   "jours": 3.2916670000000003,
+   "cause": "P17",
+   "problemes": [
+    "P16",
+    "P17",
+    "P27",
+    "P6",
+    "P9"
+   ]
+  },
+  {
+   "jeu": 1,
+   "graine": 202601000,
+   "fin": "navigation",
+   "jours": 1.958333,
+   "cause": "P18",
+   "problemes": [
+    "P12",
+    "P13",
+    "P9"
+   ]
+  },
+  {
+   "jeu": 2,
+   "graine": 202602000,
+   "fin": "navigation",
+   "jours": 2.5,
+   "cause": "P18",
+   "problemes": [
+    "P12",
+    "P15",
+    "P27",
+    "P9"
+   ]
+  },
+  {
+   "jeu": 3,
+   "graine": 202603000,
+   "fin": "calculateur",
+   "jours": 0.479167,
+   "cause": "P17",
+   "problemes": [
+    "P17",
+    "P9"
+   ]
+  },
+  {
+   "jeu": 4,
+   "graine": 202604000,
+   "fin": "disqualification",
+   "jours": 20.645833000000003,
+   "cause": "P12",
+   "problemes": [
+    "P12",
+    "P2",
+    "P9"
+   ]
+  },
+  {
+   "jeu": 5,
+   "graine": 202605000,
+   "fin": "navigation",
+   "jours": 0.5208330000000001,
+   "cause": "P18",
+   "problemes": [
+    "P15",
+    "P9"
+   ]
+  }
+ ],
+ "tout_valide": [
+  {
+   "jeu": 0,
+   "graine": 202600000,
+   "fin": "arrivee",
+   "jours": 45.604167000000004,
+   "cause": null,
+   "problemes": [
+    "P2",
+    "P24"
+   ]
+  },
+  {
+   "jeu": 1,
+   "graine": 202601000,
+   "fin": "arrivee",
+   "jours": 45.645833,
+   "cause": null,
+   "problemes": [
+    "P2"
+   ]
+  },
+  {
+   "jeu": 2,
+   "graine": 202602000,
+   "fin": "capture",
+   "jours": 44.5,
+   "cause": "P24",
+   "problemes": [
+    "P2",
+    "P24"
+   ]
+  },
+  {
+   "jeu": 3,
+   "graine": 202603000,
+   "fin": "arrivee",
+   "jours": 45.770833,
+   "cause": null,
+   "problemes": [
+    "P2",
+    "P24"
+   ]
+  },
+  {
+   "jeu": 4,
+   "graine": 202604000,
+   "fin": "arrivee",
+   "jours": 45.5625,
+   "cause": null,
+   "problemes": [
+    "P2"
+   ]
+  },
+  {
+   "jeu": 5,
+   "graine": 202605000,
+   "fin": "arrivee",
+   "jours": 45.520833,
+   "cause": null,
+   "problemes": []
+  }
+ ],
+ "ancien": [
+  {
+   "jeu": 0,
+   "graine": 202600000,
+   "fin": "arrivee",
+   "jours": 48.145833,
+   "cause": null,
+   "problemes": [
+    "P16",
+    "P2",
+    "P24"
+   ]
+  },
+  {
+   "jeu": 1,
+   "graine": 202601000,
+   "fin": "arrivee",
+   "jours": 47.791667000000004,
+   "cause": null,
+   "problemes": [
+    "P2"
+   ]
+  },
+  {
+   "jeu": 2,
+   "graine": 202602000,
+   "fin": "arrivee",
+   "jours": 45.125,
+   "cause": null,
+   "problemes": [
+    "P2"
+   ]
+  },
+  {
+   "jeu": 3,
+   "graine": 202603000,
+   "fin": "arrivee",
+   "jours": 47.875,
+   "cause": null,
+   "problemes": [
+    "P2",
+    "P24"
+   ]
+  },
+  {
+   "jeu": 4,
+   "graine": 202604000,
+   "fin": "arrivee",
+   "jours": 47.791667000000004,
+   "cause": null,
+   "problemes": [
+    "P2"
+   ]
+  },
+  {
+   "jeu": 5,
+   "graine": 202605000,
+   "fin": "arrivee",
+   "jours": 47.770833,
+   "cause": null,
+   "problemes": []
+  }
+ ]
+}

@@ -1,0 +1,201 @@
+Petit Monte-Carlo sans profileur : 6.10 s (16 missions, grille C:\Users\tatat\python\moi\Tortue-du-futur\data\grille_2deg.npz)
+
+
+## Mission seule (tout validé, pas de 30 min) — 1.23 s (sous profileur) — tri : tottime
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+    98460    0.117    0.000    0.186    0.000 boat.py:152(f)
+     6564    0.040    0.000    0.229    0.000 boat.py:132(_resoudre_axe)
+     2189    0.037    0.000    0.068    0.000 environment.py:522(vecteur)
+      365    0.034    0.000    0.059    0.000 energy.py:62(prevision_solaire)
+   159875    0.031    0.000    0.032    0.000 {built-in method builtins.max}
+    37196    0.026    0.000    0.051    0.000 risks.py:345(taux)
+   159738    0.024    0.000    0.024    0.000 {method 'get' of 'dict' objects}
+     12/9    0.024    0.002    0.029    0.003 {built-in method _imp.exec_dynamic}
+     2188    0.023    0.000    0.140    0.000 energy.py:260(planifier)
+     2188    0.021    0.000    0.260    0.000 boat.py:203(equilibre)
+     2188    0.020    0.000    0.111    0.000 risks.py:391(pas)
+    41543    0.018    0.000    0.042    0.000 failures.py:66(evenement)
+     5274    0.018    0.000    0.030    0.000 geo.py:17(haversine)
+    81765    0.017    0.000    0.017    0.000 {built-in method builtins.min}
+     8872    0.015    0.000    0.015    0.000 {built-in method builtins.round}
+   105890    0.013    0.000    0.013    0.000 {built-in method math.copysign}
+    98460    0.013    0.000    0.013    0.000 {built-in method math.tanh}
+    17531    0.012    0.000    0.027    0.000 energy.py:129(fraction_accessible)
+     4376    0.012    0.000    0.031    0.000 risks.py:154(_idx)
+    98762    0.012    0.000    0.012    0.000 {built-in method math.log10}
+   116310    0.012    0.000    0.012    0.000 {built-in method builtins.abs}
+     9486    0.011    0.000    0.018    0.000 environment.py:517(_coins)
+     9855    0.010    0.000    0.010    0.000 {method 'reshape' of 'numpy.ndarray' objects}
+    41543    0.010    0.000    0.015    0.000 failures.py:54(proc)
+     6844    0.009    0.000    0.049    0.000 energy.py:142(soc)
+    41543    0.009    0.000    0.009    0.000 failures.py:34(avancer)
+    17531    0.009    0.000    0.038    0.000 energy.py:138(e_plancher)
+    35639    0.008    0.000    0.013    0.000 risks.py:316(multiplicateur)
+      938    0.008    0.000    0.016    0.000 failures.py:129(fix_gps)
+    61315    0.008    0.000    0.008    0.000 {method 'append' of 'list' objects}
+     3375    0.008    0.000    0.008    0.000 _methods.py:96(_clip)
+     2190    0.008    0.000    0.021    0.000 _methods.py:115(_mean)
+     2188    0.007    0.000    0.066    0.000 energy.py:231(_prevoir)
+     33/4    0.006    0.000    0.054    0.014 {built-in method builtins.exec}
+    51417    0.006    0.000    0.006    0.000 {built-in method math.radians}
+       12    0.006    0.001    0.006    0.001 {built-in method _imp.create_dynamic}
+     2190    0.006    0.000    0.007    0.000 _methods.py:73(_count_reduce_items)
+       94    0.006    0.000    0.006    0.000 {built-in method nt.stat}
+    58257    0.006    0.000    0.006    0.000 {built-in method builtins.isinstance}
+      730    0.006    0.000    0.008    0.000 memmap.py:358(__getitem__)
+      938    0.006    0.000    0.019    0.000 estimator_codac.py:111(delta)
+    35472    0.006    0.000    0.006    0.000 {built-in method math.cos}
+     4159    0.006    0.000    0.006    0.000 {built-in method numpy.asarray}
+    33275    0.006    0.000    0.006    0.000 {built-in method math.sin}
+     3354    0.006    0.000    0.009    0.000 geo.py:45(deplacer)
+
+
+
+## Mission seule (tout validé, pas de 30 min) — 1.23 s (sous profileur) — tri : cumulative
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+     2188    0.021    0.000    0.260    0.000 boat.py:203(equilibre)
+     6564    0.040    0.000    0.229    0.000 boat.py:132(_resoudre_axe)
+    98460    0.117    0.000    0.186    0.000 boat.py:152(f)
+     2188    0.023    0.000    0.140    0.000 energy.py:260(planifier)
+     2188    0.020    0.000    0.111    0.000 risks.py:391(pas)
+     2189    0.037    0.000    0.068    0.000 environment.py:522(vecteur)
+        6    0.000    0.000    0.067    0.011 __init__.py:1(<module>)
+     2188    0.007    0.000    0.066    0.000 energy.py:231(_prevoir)
+        1    0.000    0.000    0.061    0.061 estimator_codac.py:95(centre_geo)
+      365    0.034    0.000    0.059    0.000 energy.py:62(prevision_solaire)
+     27/4    0.000    0.000    0.057    0.014 <frozen importlib._bootstrap>:1349(_find_and_load)
+     27/4    0.000    0.000    0.057    0.014 <frozen importlib._bootstrap>:1304(_find_and_load_unlocked)
+     27/4    0.000    0.000    0.056    0.014 <frozen importlib._bootstrap>:911(_load_unlocked)
+     15/4    0.000    0.000    0.056    0.014 <frozen importlib._bootstrap_external>:989(exec_module)
+     72/7    0.000    0.000    0.055    0.008 <frozen importlib._bootstrap>:480(_call_with_frames_removed)
+     33/4    0.006    0.000    0.054    0.014 {built-in method builtins.exec}
+    37196    0.026    0.000    0.051    0.000 risks.py:345(taux)
+     6844    0.009    0.000    0.049    0.000 energy.py:142(soc)
+    41543    0.018    0.000    0.042    0.000 failures.py:66(evenement)
+    17531    0.009    0.000    0.038    0.000 energy.py:138(e_plancher)
+        1    0.000    0.000    0.033    0.033 estimator_codac.py:92(centre_local)
+   159875    0.031    0.000    0.032    0.000 {built-in method builtins.max}
+        1    0.000    0.000    0.031    0.031 estimator_codac.py:1(<module>)
+     4376    0.012    0.000    0.031    0.000 risks.py:154(_idx)
+     5274    0.018    0.000    0.030    0.000 geo.py:17(haversine)
+     12/9    0.000    0.000    0.029    0.003 <frozen importlib._bootstrap_external>:1295(exec_module)
+     12/9    0.024    0.002    0.029    0.003 {built-in method _imp.exec_dynamic}
+    17531    0.012    0.000    0.027    0.000 energy.py:129(fraction_accessible)
+   159738    0.024    0.000    0.024    0.000 {method 'get' of 'dict' objects}
+    15/13    0.000    0.000    0.024    0.002 <frozen importlib._bootstrap>:1390(_handle_fromlist)
+      5/3    0.000    0.000    0.024    0.008 {built-in method builtins.__import__}
+     2189    0.002    0.000    0.023    0.000 {method 'mean' of 'numpy.ndarray' objects}
+     3375    0.004    0.000    0.022    0.000 fromnumeric.py:2245(clip)
+     2190    0.008    0.000    0.021    0.000 _methods.py:115(_mean)
+      938    0.006    0.000    0.019    0.000 estimator_codac.py:111(delta)
+     2188    0.002    0.000    0.018    0.000 risks.py:174(commerce_h_km2)
+     3375    0.004    0.000    0.018    0.000 fromnumeric.py:48(_wrapfunc)
+     9486    0.011    0.000    0.018    0.000 environment.py:517(_coins)
+     2188    0.002    0.000    0.017    0.000 risks.py:170(peche_h_km2)
+    81765    0.017    0.000    0.017    0.000 {built-in method builtins.min}
+      938    0.008    0.000    0.016    0.000 failures.py:129(fix_gps)
+     8872    0.015    0.000    0.015    0.000 {built-in method builtins.round}
+    41543    0.010    0.000    0.015    0.000 failures.py:54(proc)
+      897    0.005    0.000    0.015    0.000 autopilot.py:51(cible_guidage)
+     3037    0.005    0.000    0.015    0.000 _function_base_impl.py:1550(interp)
+
+
+
+## Petit Monte-Carlo (8 runs × 2 configurations, un processus) — 12.16 s (sous profileur) — tri : tottime
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+  1123110    1.334    0.000    2.106    0.000 boat.py:152(f)
+    74874    0.454    0.000    2.604    0.000 boat.py:132(_resoudre_axe)
+    24974    0.412    0.000    0.757    0.000 environment.py:522(vecteur)
+  1751489    0.332    0.000    0.336    0.000 {built-in method builtins.max}
+   424286    0.291    0.000    0.588    0.000 risks.py:345(taux)
+  1628226    0.248    0.000    0.248    0.000 {method 'get' of 'dict' objects}
+    24958    0.244    0.000    2.952    0.000 boat.py:203(equilibre)
+     2573    0.240    0.000    0.396    0.000 energy.py:62(prevision_solaire)
+    24958    0.226    0.000    1.270    0.000 risks.py:391(pas)
+   440669    0.202    0.000    0.465    0.000 failures.py:66(evenement)
+    56914    0.195    0.000    0.331    0.000 geo.py:17(haversine)
+   100672    0.172    0.000    0.172    0.000 {built-in method builtins.round}
+   840828    0.168    0.000    0.168    0.000 {built-in method builtins.min}
+    15414    0.163    0.000    0.973    0.000 energy.py:260(planifier)
+  1206864    0.156    0.000    0.156    0.000 {built-in method math.copysign}
+  1123110    0.153    0.000    0.153    0.000 {built-in method math.tanh}
+  1127942    0.141    0.000    0.141    0.000 {built-in method math.log10}
+    49916    0.137    0.000    0.335    0.000 risks.py:154(_idx)
+   170493    0.133    0.000    0.297    0.000 energy.py:129(fraction_accessible)
+  1317709    0.129    0.000    0.129    0.000 {built-in method builtins.abs}
+   105042    0.127    0.000    0.194    0.000 environment.py:517(_coins)
+   107638    0.108    0.000    0.108    0.000 {method 'reshape' of 'numpy.ndarray' objects}
+   440669    0.103    0.000    0.169    0.000 failures.py:54(proc)
+   402433    0.098    0.000    0.152    0.000 risks.py:316(multiplicateur)
+   440669    0.095    0.000    0.095    0.000 failures.py:34(avancer)
+    67254    0.092    0.000    0.458    0.000 energy.py:142(soc)
+   691929    0.089    0.000    0.089    0.000 {method 'append' of 'list' objects}
+   170493    0.086    0.000    0.406    0.000 energy.py:138(e_plancher)
+    31172    0.076    0.000    0.076    0.000 _methods.py:96(_clip)
+     8064    0.072    0.000    0.144    0.000 failures.py:129(fix_gps)
+    41193    0.064    0.000    0.064    0.000 {built-in method numpy.asarray}
+   520050    0.062    0.000    0.062    0.000 {built-in method math.radians}
+   341823    0.061    0.000    0.061    0.000 {built-in method math.sin}
+   362345    0.061    0.000    0.061    0.000 {built-in method math.cos}
+    24958    0.060    0.000    0.066    0.000 environment.py:714(au_large)
+   594924    0.060    0.000    0.060    0.000 {built-in method builtins.isinstance}
+    61202    0.059    0.000    0.084    0.000 geo.py:62(vers_local)
+    33800    0.058    0.000    0.096    0.000 geo.py:45(deplacer)
+    10599    0.058    0.000    0.101    0.000 energy.py:26(zenith_rad)
+    15428    0.057    0.000    0.149    0.000 _methods.py:115(_mean)
+    33042    0.057    0.000    0.057    0.000 {built-in method numpy._core._multiarray_umath.interp}
+    33042    0.053    0.000    0.166    0.000 _function_base_impl.py:1550(interp)
+    52544    0.053    0.000    0.053    0.000 {method 'astype' of 'numpy.ndarray' objects}
+     9322    0.051    0.000    0.166    0.000 estimator_codac.py:111(delta)
+    24545    0.051    0.000    0.182    0.000 failures.py:102(pas)
+
+
+
+## Petit Monte-Carlo (8 runs × 2 configurations, un processus) — 12.16 s (sous profileur) — tri : cumulative
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+    24958    0.244    0.000    2.952    0.000 boat.py:203(equilibre)
+    74874    0.454    0.000    2.604    0.000 boat.py:132(_resoudre_axe)
+  1123110    1.334    0.000    2.106    0.000 boat.py:152(f)
+    24958    0.226    0.000    1.270    0.000 risks.py:391(pas)
+    15414    0.163    0.000    0.973    0.000 energy.py:260(planifier)
+    24974    0.412    0.000    0.757    0.000 environment.py:522(vecteur)
+   424286    0.291    0.000    0.588    0.000 risks.py:345(taux)
+   440669    0.202    0.000    0.465    0.000 failures.py:66(evenement)
+    67254    0.092    0.000    0.458    0.000 energy.py:142(soc)
+    15414    0.050    0.000    0.447    0.000 energy.py:231(_prevoir)
+   170493    0.086    0.000    0.406    0.000 energy.py:138(e_plancher)
+     2573    0.240    0.000    0.396    0.000 energy.py:62(prevision_solaire)
+  1751489    0.332    0.000    0.336    0.000 {built-in method builtins.max}
+    49916    0.137    0.000    0.335    0.000 risks.py:154(_idx)
+    56914    0.195    0.000    0.331    0.000 geo.py:17(haversine)
+   170493    0.133    0.000    0.297    0.000 energy.py:129(fraction_accessible)
+  1628226    0.248    0.000    0.248    0.000 {method 'get' of 'dict' objects}
+    31172    0.041    0.000    0.216    0.000 fromnumeric.py:2245(clip)
+    24958    0.024    0.000    0.199    0.000 risks.py:174(commerce_h_km2)
+   105042    0.127    0.000    0.194    0.000 environment.py:517(_coins)
+    24958    0.022    0.000    0.182    0.000 risks.py:170(peche_h_km2)
+    24545    0.051    0.000    0.182    0.000 failures.py:102(pas)
+    31172    0.035    0.000    0.175    0.000 fromnumeric.py:48(_wrapfunc)
+   100672    0.172    0.000    0.172    0.000 {built-in method builtins.round}
+   440669    0.103    0.000    0.169    0.000 failures.py:54(proc)
+   840828    0.168    0.000    0.168    0.000 {built-in method builtins.min}
+     9322    0.051    0.000    0.166    0.000 estimator_codac.py:111(delta)
+    33042    0.053    0.000    0.166    0.000 _function_base_impl.py:1550(interp)
+    15421    0.013    0.000    0.163    0.000 {method 'mean' of 'numpy.ndarray' objects}
+    24235    0.037    0.000    0.156    0.000 energy.py:49(p_solaire)
+  1206864    0.156    0.000    0.156    0.000 {built-in method math.copysign}
+  1123110    0.153    0.000    0.153    0.000 {built-in method math.tanh}
+   402433    0.098    0.000    0.152    0.000 risks.py:316(multiplicateur)
+    15428    0.057    0.000    0.149    0.000 _methods.py:115(_mean)
+     8064    0.072    0.000    0.144    0.000 failures.py:129(fix_gps)
+  1127942    0.141    0.000    0.141    0.000 {built-in method math.log10}
+     9330    0.048    0.000    0.138    0.000 failures.py:147(cap_compas)
+    24958    0.033    0.000    0.133    0.000 risks.py:296(facteur_chavirage)
+  1317709    0.129    0.000    0.129    0.000 {built-in method builtins.abs}
+     6991    0.040    0.000    0.116    0.000 autopilot.py:51(cible_guidage)
+   107638    0.108    0.000    0.108    0.000 {method 'reshape' of 'numpy.ndarray' objects}
+    10599    0.058    0.000    0.101    0.000 energy.py:26(zenith_rad)
+    33800    0.058    0.000    0.096    0.000 geo.py:45(deplacer)
+    31172    0.020    0.000    0.096    0.000 {method 'clip' of 'numpy.ndarray' objects}
+   440669    0.095    0.000    0.095    0.000 failures.py:34(avancer)
+

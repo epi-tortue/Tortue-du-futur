@@ -1,0 +1,123 @@
+Fin des données ERA5 : 2026-11-02
+Grille déjà assemblée : C:\Users\tatat\python\moi\Tortue-du-futur\data\grille_2deg.npz
+[meteo 2024-01] 225 points à télécharger
+[meteo 2024-01] ok
+[marine 2024-01] 225 points à télécharger
+[marine 2024-01] ok
+[meteo 2025-01] 225 points à télécharger
+[meteo 2025-01] ok
+[marine 2025-01] 225 points à télécharger
+[marine 2025-01] ok
+[meteo 2024-02] 225 points à télécharger
+[meteo 2024-02] ok
+[marine 2024-02] 225 points à télécharger
+[marine 2024-02] ok
+[meteo 2025-02] 225 points à télécharger
+[meteo 2025-02] ok
+[marine 2025-02] 225 points à télécharger
+[marine 2025-02] ok
+[meteo 2024-03] 225 points à télécharger
+[meteo 2024-03] ok
+[marine 2024-03] 225 points à télécharger
+[marine 2024-03] ok
+[meteo 2025-03] 225 points à télécharger
+[meteo 2025-03] ok
+[marine 2025-03] 225 points à télécharger
+[marine 2025-03] ok
+[meteo 2024-04] 225 points à télécharger
+[meteo 2024-04] ok
+[marine 2024-04] 225 points à télécharger
+[marine 2024-04] ok
+[meteo 2025-04] 225 points à télécharger
+[meteo 2025-04] ok
+[marine 2025-04] 225 points à télécharger
+[marine 2025-04] ok
+[meteo 2024-05] 225 points à télécharger
+[meteo 2024-05] ok
+[marine 2024-05] 225 points à télécharger
+[marine 2024-05] ok
+[meteo 2025-05] 225 points à télécharger
+[meteo 2025-05] ok
+[marine 2025-05] 225 points à télécharger
+[marine 2025-05] ok
+[meteo 2024-06] 225 points à télécharger
+[meteo 2024-06] ok
+[marine 2024-06] 225 points à télécharger
+Traceback (most recent call last):
+  File "C:\Users\tatat\python\moi\Tortue-du-futur\main.py", line 290, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "C:\Users\tatat\python\moi\Tortue-du-futur\main.py", line 286, in main
+    return fn(args, cfg)
+           ^^^^^^^^^^^^^
+  File "C:\Users\tatat\python\moi\Tortue-du-futur\main.py", line 83, in cmd_donnees
+    E.telecharger_annees(cfg)
+  File "C:\Users\tatat\python\moi\Tortue-du-futur\sim\environment.py", line 167, in telecharger_annees
+    fait += telecharger_open_meteo(cfg, g, log=log, periode=(str(d0), str(d1)))
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\tatat\python\moi\Tortue-du-futur\sim\environment.py", line 295, in telecharger_open_meteo
+    rep = _requete(url, params)
+          ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\tatat\python\moi\Tortue-du-futur\sim\environment.py", line 255, in _requete
+    raise RuntimeError(f"Open-Meteo injoignable après {essais} essais ({params.get('start_date')})")
+RuntimeError: Open-Meteo injoignable après 6 essais (2024-06-01)
+Fin des donnÃ©es ERA5 : 2026-11-02
+Grille dÃ©jÃ  assemblÃ©e : C:\Users\tatat\python\moi\Tortue-du-futur\data\grille_2deg.npz
+[marine 2024-06] 155 points Ã  tÃ©lÃ©charger
+[marine 2024-06] ok
+[meteo 2025-06] 225 points Ã  tÃ©lÃ©charger
+[meteo 2025-06] ok
+[marine 2025-06] 225 points Ã  tÃ©lÃ©charger
+[marine 2025-06] ok
+[meteo 2024-07] 225 points Ã  tÃ©lÃ©charger
+[meteo 2024-07] ok
+[marine 2024-07] 225 points Ã  tÃ©lÃ©charger
+[marine 2024-07] ok
+[meteo 2025-07] 225 points Ã  tÃ©lÃ©charger
+[meteo 2025-07] ok
+[marine 2025-07] 225 points Ã  tÃ©lÃ©charger
+[marine 2025-07] ok
+[meteo 2024-08] 225 points Ã  tÃ©lÃ©charger
+[meteo 2024-08] ok
+[marine 2024-08] 225 points Ã  tÃ©lÃ©charger
+[marine 2024-08] ok
+[meteo 2025-08] 225 points Ã  tÃ©lÃ©charger
+[meteo 2025-08] ok
+[marine 2025-08] 225 points Ã  tÃ©lÃ©charger
+[marine 2025-08] ok
+[meteo 2024-09] 225 points Ã  tÃ©lÃ©charger
+[meteo 2024-09] ok
+[marine 2024-09] 225 points Ã  tÃ©lÃ©charger
+[marine 2024-09] ok
+[meteo 2025-09] 225 points Ã  tÃ©lÃ©charger
+[meteo 2025-09] ok
+[marine 2025-09] 225 points Ã  tÃ©lÃ©charger
+[marine 2025-09] ok
+[meteo 2024-10] 225 points Ã  tÃ©lÃ©charger
+[meteo 2024-10] ok
+[marine 2024-10] 225 points Ã  tÃ©lÃ©charger
+[marine 2024-10] ok
+[meteo 2025-10] 225 points Ã  tÃ©lÃ©charger
+[meteo 2025-10] ok
+[marine 2025-10] 225 points Ã  tÃ©lÃ©charger
+[marine 2025-10] ok
+[meteo 2024-11] 225 points Ã  tÃ©lÃ©charger
+[meteo 2024-11] ok
+[marine 2024-11] 225 points Ã  tÃ©lÃ©charger
+[marine 2024-11] ok
+[meteo 2025-11] 225 points Ã  tÃ©lÃ©charger
+[meteo 2025-11] ok
+[marine 2025-11] 225 points Ã  tÃ©lÃ©charger
+[marine 2025-11] ok
+[meteo 2024-12] 225 points Ã  tÃ©lÃ©charger
+[meteo 2024-12] ok
+[marine 2024-12] 225 points Ã  tÃ©lÃ©charger
+[marine 2024-12] ok
+[meteo 2025-12] 225 points Ã  tÃ©lÃ©charger
+[meteo 2025-12] ok
+[marine 2025-12] 225 points Ã  tÃ©lÃ©charger
+[marine 2025-12] ok
+Grille 2024 assemblÃ©e : 2024-01 Ã  2024-12
+Grille 2025 assemblÃ©e : 2025-01 Ã  2025-12
+  2024 : 12 mois complets (2024-01 Ã  2024-12)
+  2025 : 12 mois complets (2025-01 Ã  2025-12)

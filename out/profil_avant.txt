@@ -1,0 +1,121 @@
+Petit Monte-Carlo sans profileur : 12.01 s (16 missions, grille C:\Users\tatat\python\moi\Tortue-du-futur\data\grille_2deg.npz)
+
+
+## Mission seule (tout validé, pas de 30 min) — 2.33 s (sous profileur) — tri : tottime
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+    98943    0.152    0.000    0.326    0.000 boat.py:67(r_carene)
+     1096    0.104    0.000    0.171    0.000 energy.py:62(prevision_solaire)
+     5482    0.063    0.000    0.108    0.000 numeric.py:997(tensordot)
+    98640    0.062    0.000    0.445    0.000 boat.py:125(f)
+    98942    0.061    0.000    0.104    0.000 boat.py:62(k_forme)
+     2193    0.061    0.000    0.225    0.000 environment.py:516(vecteur)
+   290334    0.054    0.000    0.055    0.000 {built-in method builtins.max}
+     5283    0.039    0.000    0.083    0.000 geo.py:10(haversine)
+    62334    0.039    0.000    0.039    0.000 {built-in method numpy.asarray}
+     8771    0.037    0.000    0.058    0.000 memmap.py:358(__getitem__)
+     2198    0.036    0.000    0.103    0.000 inspect.py:2366(_signature_from_function)
+     4384    0.036    0.000    0.036    0.000 {method 'strftime' of 'datetime.date' objects}
+    61376    0.036    0.000    0.065    0.000 risks.py:338(taux)
+     6576    0.034    0.000    0.483    0.000 boat.py:118(_resoudre_axe)
+    62501    0.033    0.000    0.049    0.000 boat.py:80(poussee)
+   177627    0.032    0.000    0.032    0.000 {built-in method builtins.min}
+    11026    0.031    0.000    0.031    0.000 _methods.py:96(_clip)
+     2192    0.029    0.000    0.138    0.000 risks.py:384(pas)
+   157458    0.029    0.000    0.029    0.000 {method 'get' of 'dict' objects}
+    17578    0.028    0.000    0.097    0.000 energy.py:129(fraction_accessible)
+   207446    0.026    0.000    0.026    0.000 {built-in method math.sqrt}
+     2192    0.026    0.000    0.302    0.000 energy.py:249(planifier)
+     12/9    0.025    0.002    0.030    0.003 {built-in method _imp.exec_dynamic}
+     2192    0.025    0.000    0.026    0.000 creation.py:140(linestrings)
+    18433    0.024    0.000    0.024    0.000 {built-in method numpy._core._multiarray_umath.interp}
+
+
+
+## Mission seule (tout validé, pas de 30 min) — 2.33 s (sous profileur) — tri : cumulative
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+     2192    0.021    0.000    0.514    0.000 boat.py:142(equilibre)
+     6576    0.034    0.000    0.483    0.000 boat.py:118(_resoudre_axe)
+    98640    0.062    0.000    0.445    0.000 boat.py:125(f)
+    98943    0.152    0.000    0.326    0.000 boat.py:67(r_carene)
+     2192    0.026    0.000    0.302    0.000 energy.py:249(planifier)
+     2192    0.009    0.000    0.230    0.000 linestring.py:40(__new__)
+     2193    0.061    0.000    0.225    0.000 environment.py:516(vecteur)
+     2192    0.007    0.000    0.215    0.000 decorators.py:99(wrapper)
+     2192    0.008    0.000    0.179    0.000 energy.py:225(_prevoir)
+     1096    0.104    0.000    0.171    0.000 energy.py:62(prevision_solaire)
+     2192    0.029    0.000    0.138    0.000 risks.py:384(pas)
+     2198    0.002    0.000    0.138    0.000 inspect.py:3308(signature)
+     2198    0.002    0.000    0.135    0.000 inspect.py:3050(from_callable)
+2210/2198    0.015    0.000    0.133    0.000 inspect.py:2470(_signature_from_callable)
+    17578    0.010    0.000    0.109    0.000 energy.py:133(e_plancher)
+     5482    0.063    0.000    0.108    0.000 numeric.py:997(tensordot)
+    98942    0.061    0.000    0.104    0.000 boat.py:62(k_forme)
+     6864    0.010    0.000    0.103    0.000 energy.py:137(soc)
+     2198    0.036    0.000    0.103    0.000 inspect.py:2366(_signature_from_function)
+    17578    0.028    0.000    0.097    0.000 energy.py:129(fraction_accessible)
+     5283    0.039    0.000    0.083    0.000 geo.py:10(haversine)
+     4384    0.021    0.000    0.081    0.000 risks.py:153(_idx)
+    11026    0.016    0.000    0.074    0.000 fromnumeric.py:2245(clip)
+    18433    0.023    0.000    0.070    0.000 _function_base_impl.py:1550(interp)
+        6    0.000    0.000    0.069    0.011 __init__.py:1(<module>)
+
+
+
+## Petit Monte-Carlo (8 runs × 2 configurations, un processus) — 23.51 s (sous profileur) — tri : tottime
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+  1128633    1.745    0.000    3.743    0.000 boat.py:67(r_carene)
+  1123785    0.714    0.000    5.043    0.000 boat.py:125(f)
+  1128617    0.711    0.000    1.204    0.000 boat.py:62(k_forme)
+     7716    0.710    0.000    1.137    0.000 energy.py:62(prevision_solaire)
+    24989    0.673    0.000    2.526    0.000 environment.py:516(vecteur)
+    57694    0.655    0.000    1.123    0.000 numeric.py:997(tensordot)
+  3174182    0.576    0.000    0.581    0.000 {built-in method builtins.max}
+    56942    0.417    0.000    0.888    0.000 geo.py:10(haversine)
+    24973    0.401    0.000    1.156    0.000 inspect.py:2366(_signature_from_function)
+   654406    0.400    0.000    0.400    0.000 {built-in method numpy.asarray}
+   699244    0.400    0.000    0.730    0.000 risks.py:338(taux)
+    49946    0.385    0.000    0.385    0.000 {method 'strftime' of 'datetime.date' objects}
+    74919    0.382    0.000    5.465    0.000 boat.py:118(_resoudre_axe)
+  1926444    0.343    0.000    0.343    0.000 {built-in method builtins.min}
+   679773    0.331    0.000    0.482    0.000 boat.py:80(poussee)
+    90399    0.329    0.000    0.542    0.000 memmap.py:358(__getitem__)
+    24973    0.327    0.000    1.558    0.000 risks.py:384(pas)
+  2365845    0.302    0.000    0.302    0.000 {built-in method math.sqrt}
+   105394    0.299    0.000    0.299    0.000 _methods.py:96(_clip)
+  1628367    0.287    0.000    0.287    0.000 {method 'get' of 'dict' objects}
+    24973    0.273    0.000    0.282    0.000 creation.py:140(linestrings)
+   170666    0.269    0.000    0.938    0.000 energy.py:129(fraction_accessible)
+    24973    0.260    0.000    0.389    0.000 inspect.py:3102(_bind)
+   174811    0.242    0.000    0.430    0.000 inspect.py:2712(__init__)
+    49946    0.239    0.000    0.895    0.000 risks.py:153(_idx)
+
+
+
+## Petit Monte-Carlo (8 runs × 2 configurations, un processus) — 23.51 s (sous profileur) — tri : cumulative
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+    24973    0.238    0.000    5.815    0.000 boat.py:142(equilibre)
+    74919    0.382    0.000    5.465    0.000 boat.py:118(_resoudre_axe)
+  1123785    0.714    0.000    5.043    0.000 boat.py:125(f)
+  1128633    1.745    0.000    3.743    0.000 boat.py:67(r_carene)
+    24973    0.105    0.000    2.572    0.000 linestring.py:40(__new__)
+    24989    0.673    0.000    2.526    0.000 environment.py:516(vecteur)
+    24973    0.082    0.000    2.398    0.000 decorators.py:99(wrapper)
+    15429    0.177    0.000    2.046    0.000 energy.py:249(planifier)
+    24973    0.327    0.000    1.558    0.000 risks.py:384(pas)
+    24973    0.026    0.000    1.534    0.000 inspect.py:3308(signature)
+    24973    0.023    0.000    1.508    0.000 inspect.py:3050(from_callable)
+    24973    0.168    0.000    1.485    0.000 inspect.py:2470(_signature_from_callable)
+  1128617    0.711    0.000    1.204    0.000 boat.py:62(k_forme)
+    15429    0.057    0.000    1.195    0.000 energy.py:225(_prevoir)
+    24973    0.401    0.000    1.156    0.000 inspect.py:2366(_signature_from_function)
+     7716    0.710    0.000    1.137    0.000 energy.py:62(prevision_solaire)
+    57694    0.655    0.000    1.123    0.000 numeric.py:997(tensordot)
+   170666    0.096    0.000    1.056    0.000 energy.py:133(e_plancher)
+    67331    0.101    0.000    1.011    0.000 energy.py:137(soc)
+   170666    0.269    0.000    0.938    0.000 energy.py:129(fraction_accessible)
+    49946    0.239    0.000    0.895    0.000 risks.py:153(_idx)
+    56942    0.417    0.000    0.888    0.000 geo.py:10(haversine)
+   699244    0.400    0.000    0.730    0.000 risks.py:338(taux)
+   105394    0.148    0.000    0.725    0.000 fromnumeric.py:2245(clip)
+   178756    0.226    0.000    0.679    0.000 _function_base_impl.py:1550(interp)
+

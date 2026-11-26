@@ -1,0 +1,46 @@
+Fin des données ERA5 : 2026-11-02
+[meteo 2026-01] 25 points à télécharger
+[meteo 2026-01] ok
+[marine 2026-01] 25 points à télécharger
+[marine 2026-01] ok
+[meteo 2026-02] 25 points à télécharger
+[meteo 2026-02] ok
+[marine 2026-02] 25 points à télécharger
+[marine 2026-02] ok
+[meteo 2026-03] 25 points à télécharger
+[meteo 2026-03] ok
+[marine 2026-03] 25 points à télécharger
+[marine 2026-03] ok
+[meteo 2026-04] 25 points à télécharger
+[meteo 2026-04] ok
+[marine 2026-04] 25 points à télécharger
+[marine 2026-04] ok
+[meteo 2026-05] 25 points à télécharger
+[meteo 2026-05] ok
+[marine 2026-05] 25 points à télécharger
+[marine 2026-05] ok
+[meteo 2026-06] 25 points à télécharger
+[meteo 2026-06] ok
+[marine 2026-06] 25 points à télécharger
+[marine 2026-06] ok
+[meteo 2026-07] 25 points à télécharger
+[meteo 2026-07] ok
+[marine 2026-07] 25 points à télécharger
+[marine 2026-07] ok
+[meteo 2026-08] 25 points à télécharger
+[meteo 2026-08] ok
+[marine 2026-08] 25 points à télécharger
+[marine 2026-08] ok
+[meteo 2026-09] 25 points à télécharger
+[meteo 2026-09] ok
+[marine 2026-09] 25 points à télécharger
+[marine 2026-09] ok
+[meteo 2026-10] 25 points à télécharger
+[meteo 2026-10] ok
+[marine 2026-10] 25 points à télécharger
+[marine 2026-10] ok
+[meteo 2026-11] 25 points à télécharger
+[meteo 2026-11] ok
+[marine 2026-11] 25 points à télécharger
+[marine 2026-11] ok
+Grille assemblée : C:\Users\tatat\python\moi\Tortue-du-futur\epitortue_sim\data\grille_2deg.npz

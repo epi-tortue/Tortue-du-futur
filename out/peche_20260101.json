@@ -1,0 +1,1 @@
+{"route_mission": {"captures": [0.165, 0.115, 0.225], "au_moins_une_rencontre": [0.405, 0.33, 0.485], "jours_median": 19.229166666666668}, "route_cotiere": {"captures": [0.78, 0.7, 0.85], "au_moins_une_rencontre": [0.985, 0.96, 1.0], "jours_median": 1.2083333333333333}, "ecart_route": [0.615, 0.525, 0.705]}
