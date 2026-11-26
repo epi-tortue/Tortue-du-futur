@@ -7,3 +7,4 @@ __pycache__/
 # sorties volumineuses (> 100 Mo, refusées par GitHub)
 *.sqlite3
 out/morris/**/runs_pannes.json.gz
+out/**/mc_*.json
